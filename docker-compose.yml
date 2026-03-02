@@ -4,14 +4,14 @@ services:
     container_name: panel
     restart: unless-stopped
     ports:
-      - '6511:6511'
+      - '6515:6515'
     volumes:
       # Persistent data (database + update trigger)
       - panel-data:/data
       # Mount your book/manga libraries
       - /mnt/books/manga:/libraries/manga:ro
     environment:
-      - PANEL_PORT=6511
+      - PANEL_PORT=6515
       - PANEL_DATA_DIR=/data
       - DATABASE_URL=sqlite:///data/panel.db?mode=rwc
       - PANEL_LOG_LEVEL=info

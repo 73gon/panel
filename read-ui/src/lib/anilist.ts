@@ -63,7 +63,6 @@ query SearchManga($search: String!) {
 
 /** Extract year from folder-name patterns like "(1999)", "[1999]", or "- 1999" */
 function extractYear(name: string): number | null {
-  console.log(name)
   const m = name.match(
     /[\(\[]\s*(\d{4})\s*[\)\]]|[-\u2013\u2014]\s*(\d{4})\s*$/,
   )
@@ -308,7 +307,7 @@ async function fetchAndCache(seriesName: string): Promise<AnilistMedia | null> {
 
     // Pick best candidate: prefer year match, otherwise take most popular (first)
     let media: AnilistMedia = candidates[0]
-    console.log(year)
+
     if (year) {
       const yearMatch = candidates.find((c) => c.startDate?.year === year)
       if (yearMatch) media = yearMatch

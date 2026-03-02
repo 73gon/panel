@@ -38,7 +38,10 @@ export function ensureDeviceId(): string {
   let id = localStorage.getItem('device_id')
   if (!id) {
     // crypto.randomUUID() requires secure context (HTTPS); fall back for HTTP
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    if (
+      typeof crypto !== 'undefined' &&
+      typeof crypto.randomUUID === 'function'
+    ) {
       id = crypto.randomUUID()
     } else {
       id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -295,7 +298,10 @@ export async function changeAdminPassword(
   })
 }
 
-export async function triggerUpdate(): Promise<{ status: string; message: string }> {
+export async function triggerUpdate(): Promise<{
+  status: string
+  message: string
+}> {
   return request('/admin/update', { method: 'POST' })
 }
 

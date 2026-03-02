@@ -14,6 +14,7 @@ use axum::routing::{delete, get, post, put};
 use axum::Router;
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
+use tower_http::compression::CompressionLayer;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
@@ -118,6 +119,16 @@ async fn main() -> anyhow::Result<()> {
             "/api/books/{book_id}/pages/{page_num}",
             get(api::reader::page),
         )
+        // Book download (offline / iOS)
+        .route(
+            "/api/books/{book_id}/download",
+            get(api::reader::download_book),
+        )
+        // Page manifest (iOS batch download)
+        .route(
+            "/api/books/{book_id}/manifest",
+            get(api::reader::page_manifest),
+        )
         // Profiles
         .route("/api/profiles", get(api::profile::list_profiles))
         .route(
@@ -133,6 +144,16 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/api/progress/migrate",
             post(api::progress::migrate_progress),
+        )
+        // Batch progress (fetch multiple at once)
+        .route(
+            "/api/progress/batch",
+            get(api::progress::batch_progress),
+        )
+        // User preferences
+        .route(
+            "/api/preferences",
+            get(api::progress::get_preferences).put(api::progress::update_preferences),
         )
         // Admin
         .route("/api/admin/status", get(api::admin::admin_status))
@@ -161,6 +182,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/admin/password", put(api::admin::change_password))
         .route("/api/admin/update", post(api::admin::trigger_update))
         .layer(cors)
+        .layer(CompressionLayer::new().gzip(true).br(true))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
         // Serve static frontend files in production

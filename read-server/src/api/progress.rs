@@ -88,75 +88,43 @@ pub async fn update_progress(
     let now = chrono::Utc::now().to_rfc3339();
 
     if let Some(pid) = &profile_id {
-        // Upsert profile progress
-        let existing: Option<(String,)> = sqlx::query_as(
-            "SELECT id FROM reading_progress WHERE profile_id = ? AND book_id = ?",
+        // Upsert profile progress using ON CONFLICT
+        let id = uuid::Uuid::new_v4().to_string();
+        sqlx::query(
+            "INSERT INTO reading_progress (id, profile_id, book_id, page_number, is_completed, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT(profile_id, book_id) WHERE profile_id IS NOT NULL
+             DO UPDATE SET page_number = excluded.page_number,
+                           is_completed = excluded.is_completed,
+                           updated_at = excluded.updated_at",
         )
+        .bind(&id)
         .bind(pid)
         .bind(&body.book_id)
-        .fetch_optional(&state.db)
+        .bind(page_internal)
+        .bind(completed)
+        .bind(&now)
+        .execute(&state.db)
         .await?;
-
-        if let Some((id,)) = existing {
-            sqlx::query(
-                "UPDATE reading_progress SET page_number = ?, is_completed = ?, updated_at = ? WHERE id = ?",
-            )
-            .bind(page_internal)
-            .bind(completed)
-            .bind(&now)
-            .bind(&id)
-            .execute(&state.db)
-            .await?;
-        } else {
-            let id = uuid::Uuid::new_v4().to_string();
-            sqlx::query(
-                "INSERT INTO reading_progress (id, profile_id, book_id, page_number, is_completed, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?)",
-            )
-            .bind(&id)
-            .bind(pid)
-            .bind(&body.book_id)
-            .bind(page_internal)
-            .bind(completed)
-            .bind(&now)
-            .execute(&state.db)
-            .await?;
-        }
     } else if let Some(did) = &device_id {
-        // Upsert device progress
-        let existing: Option<(String,)> = sqlx::query_as(
-            "SELECT id FROM reading_progress WHERE device_id = ? AND book_id = ? AND profile_id IS NULL",
+        // Upsert device progress using ON CONFLICT
+        let id = uuid::Uuid::new_v4().to_string();
+        sqlx::query(
+            "INSERT INTO reading_progress (id, device_id, book_id, page_number, is_completed, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT(device_id, book_id) WHERE profile_id IS NULL AND device_id IS NOT NULL
+             DO UPDATE SET page_number = excluded.page_number,
+                           is_completed = excluded.is_completed,
+                           updated_at = excluded.updated_at",
         )
+        .bind(&id)
         .bind(did)
         .bind(&body.book_id)
-        .fetch_optional(&state.db)
+        .bind(page_internal)
+        .bind(completed)
+        .bind(&now)
+        .execute(&state.db)
         .await?;
-
-        if let Some((id,)) = existing {
-            sqlx::query(
-                "UPDATE reading_progress SET page_number = ?, is_completed = ?, updated_at = ? WHERE id = ?",
-            )
-            .bind(page_internal)
-            .bind(completed)
-            .bind(&now)
-            .bind(&id)
-            .execute(&state.db)
-            .await?;
-        } else {
-            let id = uuid::Uuid::new_v4().to_string();
-            sqlx::query(
-                "INSERT INTO reading_progress (id, device_id, book_id, page_number, is_completed, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?)",
-            )
-            .bind(&id)
-            .bind(did)
-            .bind(&body.book_id)
-            .bind(page_internal)
-            .bind(completed)
-            .bind(&now)
-            .execute(&state.db)
-            .await?;
-        }
     } else {
         return Err(AppError::BadRequest(
             "Either a profile session or X-Device-Id header is required".to_string(),
@@ -233,6 +201,65 @@ pub async fn migrate_progress(
     Ok(StatusCode::NO_CONTENT)
 }
 
+// ── Batch progress ──
+
+#[derive(Deserialize)]
+pub struct BatchProgressQuery {
+    pub book_ids: String, // comma-separated
+}
+
+#[derive(Serialize)]
+pub struct BatchProgressResponse {
+    pub progress: std::collections::HashMap<String, ProgressResponse>,
+}
+
+pub async fn batch_progress(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<BatchProgressQuery>,
+) -> Result<Json<BatchProgressResponse>, AppError> {
+    let profile_id = extract_profile_id(&state, &headers).await;
+    let device_id = extract_device_id(&state, &headers).await;
+
+    let book_ids: Vec<&str> = query.book_ids.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+    let mut progress_map = std::collections::HashMap::new();
+
+    for book_id in &book_ids {
+        let row: Option<(String, i32, i32, String)> = if let Some(pid) = &profile_id {
+            sqlx::query_as(
+                "SELECT book_id, page_number, is_completed, updated_at
+                 FROM reading_progress WHERE profile_id = ? AND book_id = ?",
+            )
+            .bind(pid)
+            .bind(book_id)
+            .fetch_optional(&state.db)
+            .await?
+        } else if let Some(did) = &device_id {
+            sqlx::query_as(
+                "SELECT book_id, page_number, is_completed, updated_at
+                 FROM reading_progress WHERE device_id = ? AND book_id = ? AND profile_id IS NULL",
+            )
+            .bind(did)
+            .bind(book_id)
+            .fetch_optional(&state.db)
+            .await?
+        } else {
+            None
+        };
+
+        if let Some((bid, page, is_completed, updated_at)) = row {
+            progress_map.insert(bid.clone(), ProgressResponse {
+                book_id: bid,
+                page: page + 1,
+                is_completed: is_completed != 0,
+                updated_at,
+            });
+        }
+    }
+
+    Ok(Json(BatchProgressResponse { progress: progress_map }))
+}
+
 // ── Helpers ──
 
 async fn extract_profile_id(state: &AppState, headers: &HeaderMap) -> Option<String> {
@@ -287,4 +314,90 @@ async fn extract_device_id(state: &AppState, headers: &HeaderMap) -> Option<Stri
         .await;
         Some(id)
     }
+}
+
+// ── Preferences ──
+
+#[derive(Serialize)]
+pub struct PreferencesResponse {
+    pub preferences: serde_json::Value,
+}
+
+pub async fn get_preferences(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<PreferencesResponse>, AppError> {
+    let profile_id = extract_profile_id(&state, &headers).await;
+    let device_id = extract_device_id(&state, &headers).await;
+
+    let row: Option<(String,)> = if let Some(pid) = &profile_id {
+        sqlx::query_as("SELECT preferences FROM user_preferences WHERE profile_id = ?")
+            .bind(pid)
+            .fetch_optional(&state.db)
+            .await?
+    } else if let Some(did) = &device_id {
+        sqlx::query_as("SELECT preferences FROM user_preferences WHERE device_id = ? AND profile_id IS NULL")
+            .bind(did)
+            .fetch_optional(&state.db)
+            .await?
+    } else {
+        None
+    };
+
+    let prefs = row
+        .and_then(|(json_str,)| serde_json::from_str(&json_str).ok())
+        .unwrap_or(serde_json::json!({}));
+
+    Ok(Json(PreferencesResponse { preferences: prefs }))
+}
+
+#[derive(Deserialize)]
+pub struct UpdatePreferencesRequest {
+    pub preferences: serde_json::Value,
+}
+
+pub async fn update_preferences(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<UpdatePreferencesRequest>,
+) -> Result<StatusCode, AppError> {
+    let profile_id = extract_profile_id(&state, &headers).await;
+    let device_id = extract_device_id(&state, &headers).await;
+    let now = chrono::Utc::now().to_rfc3339();
+    let prefs_json = serde_json::to_string(&body.preferences)
+        .map_err(|e| AppError::BadRequest(format!("Invalid JSON: {}", e)))?;
+
+    if let Some(pid) = &profile_id {
+        let id = uuid::Uuid::new_v4().to_string();
+        sqlx::query(
+            "INSERT INTO user_preferences (id, profile_id, preferences, updated_at)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT(profile_id) DO UPDATE SET preferences = excluded.preferences, updated_at = excluded.updated_at",
+        )
+        .bind(&id)
+        .bind(pid)
+        .bind(&prefs_json)
+        .bind(&now)
+        .execute(&state.db)
+        .await?;
+    } else if let Some(did) = &device_id {
+        let id = uuid::Uuid::new_v4().to_string();
+        sqlx::query(
+            "INSERT INTO user_preferences (id, device_id, preferences, updated_at)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT(device_id) DO UPDATE SET preferences = excluded.preferences, updated_at = excluded.updated_at",
+        )
+        .bind(&id)
+        .bind(did)
+        .bind(&prefs_json)
+        .bind(&now)
+        .execute(&state.db)
+        .await?;
+    } else {
+        return Err(AppError::BadRequest(
+            "Either a profile session or X-Device-Id header is required".to_string(),
+        ));
+    }
+
+    Ok(StatusCode::NO_CONTENT)
 }

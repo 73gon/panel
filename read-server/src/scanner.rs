@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use chrono::Utc;
@@ -204,6 +205,8 @@ pub async fn rescan_series(pool: &SqlitePool, series_id: &str) -> anyhow::Result
 
 /// Remove books from DB that are no longer on disk.
 async fn cleanup_stale_books(pool: &SqlitePool, library_id: &str, found_paths: &[String]) {
+    let found_set: HashSet<&str> = found_paths.iter().map(|s| s.as_str()).collect();
+
     let db_books: Vec<(String, String)> = match sqlx::query_as(
         "SELECT b.id, b.path FROM books b
          JOIN series s ON b.series_id = s.id
@@ -221,7 +224,7 @@ async fn cleanup_stale_books(pool: &SqlitePool, library_id: &str, found_paths: &
     };
 
     for (book_id, book_path) in &db_books {
-        if !found_paths.contains(book_path) {
+        if !found_set.contains(book_path.as_str()) {
             tracing::info!("Removing stale book: {}", book_path);
             let _ = sqlx::query("DELETE FROM pages WHERE book_id = ?")
                 .bind(book_id)
@@ -393,21 +396,34 @@ async fn process_cbz(
     .execute(pool)
     .await?;
 
-    // Insert pages
-    for (i, page) in zip_index.pages.iter().enumerate() {
-        sqlx::query(
-            "INSERT INTO pages (book_id, page_number, entry_name, entry_offset, compressed_size, uncompressed_size, compression)
-             VALUES (?, ?, ?, ?, ?, ?, ?)",
-        )
-        .bind(&book_id)
-        .bind(i as i32)
-        .bind(&page.entry_name)
-        .bind(page.local_header_offset as i64)
-        .bind(page.compressed_size as i64)
-        .bind(page.uncompressed_size as i64)
-        .bind(page.compression_method as i32)
-        .execute(pool)
-        .await?;
+    // Insert pages in batched transaction for performance
+    {
+        let mut tx = pool.begin().await?;
+        for chunk in zip_index.pages.chunks(50) {
+            let mut query = String::from(
+                "INSERT INTO pages (book_id, page_number, entry_name, entry_offset, compressed_size, uncompressed_size, compression) VALUES ",
+            );
+            let chunk_start_idx = zip_index.pages.iter().position(|p| std::ptr::eq(p, &chunk[0])).unwrap_or(0);
+            for (j, _page) in chunk.iter().enumerate() {
+                if j > 0 {
+                    query.push_str(", ");
+                }
+                query.push_str("(?, ?, ?, ?, ?, ?, ?)");
+            }
+            let mut q = sqlx::query(&query);
+            for (j, page) in chunk.iter().enumerate() {
+                let i = chunk_start_idx + j;
+                q = q.bind(&book_id)
+                    .bind(i as i32)
+                    .bind(&page.entry_name)
+                    .bind(page.local_header_offset as i64)
+                    .bind(page.compressed_size as i64)
+                    .bind(page.uncompressed_size as i64)
+                    .bind(page.compression_method as i32);
+            }
+            q.execute(&mut *tx).await?;
+        }
+        tx.commit().await?;
     }
 
     tracing::info!("Indexed book '{}' with {} pages", title, page_count);

@@ -22,7 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 import {
   fetchBooks,
-  fetchProgress,
+  fetchBatchProgress,
   rescanSeries,
   getPageUrl,
   type Book,
@@ -68,15 +68,11 @@ function SeriesDetailSkeleton() {
 export const Route = createFileRoute('/series/$seriesId')({
   loader: async ({ params }) => {
     const data = await fetchBooks(params.seriesId)
-    // Start anilist + progress fetches in parallel (non-blocking for render)
-    const [aniMedia, ...progressResults] = await Promise.all([
+    // Start anilist + batch progress fetch in parallel
+    const [aniMedia, progressMap] = await Promise.all([
       searchManga(data.series.name),
-      ...data.books.map((b) => fetchProgress(b.id)),
+      fetchBatchProgress(data.books.map((b) => b.id)),
     ])
-    const progressMap: Record<string, ReadingProgress> = {}
-    progressResults.forEach((p, i) => {
-      if (p) progressMap[data.books[i].id] = p as ReadingProgress
-    })
     return {
       seriesName: data.series.name,
       books: data.books,
@@ -146,13 +142,7 @@ function SeriesDetailPage() {
       setMedia(freshMedia)
       setCoverLoaded(false)
       // Re-fetch progress
-      const progressResults = await Promise.all(
-        data.books.map((b) => fetchProgress(b.id)),
-      )
-      const progressMap: Record<string, ReadingProgress> = {}
-      progressResults.forEach((p, i) => {
-        if (p) progressMap[data.books[i].id] = p as ReadingProgress
-      })
+      const progressMap = await fetchBatchProgress(data.books.map((b) => b.id))
       setProgress(progressMap)
     } catch (err) {
       console.error('Rescan failed:', err)
@@ -412,70 +402,72 @@ function SeriesDetailPage() {
               })}
             </div>
           ) : (
-          <div className="grid gap-2">
-            {books.map((book, i) => {
-              const prog = progress[book.id]
-              const pct = prog
-                ? Math.round((prog.page / book.page_count) * 100)
-                : 0
-              const isCompleted = prog?.is_completed
+            <div className="grid gap-2">
+              {books.map((book, i) => {
+                const prog = progress[book.id]
+                const pct = prog
+                  ? Math.round((prog.page / book.page_count) * 100)
+                  : 0
+                const isCompleted = prog?.is_completed
 
-              return (
-                <motion.div
-                  key={book.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{
-                    duration: 0.15,
-                    delay: Math.min(i * 0.015, 0.3),
-                    ease: 'easeOut',
-                  }}
-                >
-                  <Link to="/read/$bookId" params={{ bookId: book.id }}>
-                    <div className="group relative cursor-pointer overflow-hidden rounded-lg border border-border/50 bg-card px-4 py-3 transition-all hover:border-border hover:bg-accent/50">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="w-8 text-center text-xs font-medium text-muted-foreground">
-                            {book.sort_order}
-                          </span>
-                          <div>
-                            <p className="text-sm font-medium">{book.title}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {book.page_count} pages
-                            </p>
+                return (
+                  <motion.div
+                    key={book.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.15,
+                      delay: Math.min(i * 0.015, 0.3),
+                      ease: 'easeOut',
+                    }}
+                  >
+                    <Link to="/read/$bookId" params={{ bookId: book.id }}>
+                      <div className="group relative cursor-pointer overflow-hidden rounded-lg border border-border/50 bg-card px-4 py-3 transition-all hover:border-border hover:bg-accent/50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <span className="w-8 text-center text-xs font-medium text-muted-foreground">
+                              {book.sort_order}
+                            </span>
+                            <div>
+                              <p className="text-sm font-medium">
+                                {book.title}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {book.page_count} pages
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {isCompleted && (
+                              <Badge variant="secondary" className="text-xs">
+                                Completed
+                              </Badge>
+                            )}
+                            {prog && !isCompleted && (
+                              <span className="text-xs text-muted-foreground">
+                                {prog.page}/{book.page_count}
+                              </span>
+                            )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {isCompleted && (
-                            <Badge variant="secondary" className="text-xs">
-                              Completed
-                            </Badge>
-                          )}
-                          {prog && !isCompleted && (
-                            <span className="text-xs text-muted-foreground">
-                              {prog.page}/{book.page_count}
-                            </span>
-                          )}
-                        </div>
-                      </div>
 
-                      {/* Progress bar at bottom */}
-                      {pct > 0 && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5">
-                          <div
-                            className={`h-full transition-all ${
-                              isCompleted ? 'bg-green-500' : 'bg-primary'
-                            }`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </Link>
-                </motion.div>
-              )
-            })}
-          </div>
+                        {/* Progress bar at bottom */}
+                        {pct > 0 && (
+                          <div className="absolute bottom-0 left-0 right-0 h-0.5">
+                            <div
+                              className={`h-full transition-all ${
+                                isCompleted ? 'bg-green-500' : 'bg-primary'
+                              }`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+                  </motion.div>
+                )
+              })}
+            </div>
           )}
         </section>
       </div>

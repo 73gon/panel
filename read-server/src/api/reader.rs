@@ -1,6 +1,7 @@
 use axum::extract::{Path, State};
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
+use axum::Json;
 use sha2::{Digest, Sha256};
 
 use crate::error::AppError;
@@ -110,4 +111,118 @@ fn compute_etag(book_id: &str, page_num: i32, mtime: &str) -> String {
     hasher.update(mtime.as_bytes());
     let result = hasher.finalize();
     hex::encode(&result[..8])
+}
+
+/// Download the raw CBZ file for a book (for offline reading on iOS)
+pub async fn download_book(
+    State(state): State<AppState>,
+    Path(book_id): Path<String>,
+) -> Result<Response, AppError> {
+    let row: Option<(String, String, String, i64)> = sqlx::query_as(
+        "SELECT b.path, l.path, b.filename, b.file_size
+         FROM books b
+         JOIN series s ON b.series_id = s.id
+         JOIN libraries l ON s.library_id = l.id
+         WHERE b.id = ?",
+    )
+    .bind(&book_id)
+    .fetch_optional(&state.db)
+    .await?;
+
+    let (book_rel_path, lib_path, filename, file_size) = row.ok_or_else(|| {
+        AppError::NotFound(format!("Book {} not found", book_id))
+    })?;
+
+    let full_path = std::path::PathBuf::from(&lib_path).join(&book_rel_path);
+
+    if !full_path.exists() {
+        return Err(AppError::NotFound("Book file not found on disk".to_string()));
+    }
+
+    let data = tokio::fs::read(&full_path).await.map_err(|e| {
+        tracing::error!("Failed to read book file {}: {}", full_path.display(), e);
+        AppError::Internal(e.to_string())
+    })?;
+
+    Ok((
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "application/zip".to_string()),
+            (header::CONTENT_LENGTH, file_size.to_string()),
+            (
+                header::CONTENT_DISPOSITION,
+                format!("attachment; filename=\"{}\"", filename),
+            ),
+            (
+                header::CACHE_CONTROL,
+                "private, max-age=86400".to_string(),
+            ),
+        ],
+        data,
+    )
+        .into_response())
+}
+
+/// Return a manifest of all pages for a book (dimensions, sizes)
+pub async fn page_manifest(
+    State(state): State<AppState>,
+    Path(book_id): Path<String>,
+) -> Result<Json<PageManifestResponse>, AppError> {
+    let book: Option<(String, i32)> = sqlx::query_as(
+        "SELECT id, page_count FROM books WHERE id = ?",
+    )
+    .bind(&book_id)
+    .fetch_optional(&state.db)
+    .await?;
+
+    let (_, page_count) = book.ok_or_else(|| {
+        AppError::NotFound(format!("Book {} not found", book_id))
+    })?;
+
+    let pages: Vec<(i32, String, i64, i64, Option<i32>, Option<i32>)> = sqlx::query_as(
+        "SELECT page_number, entry_name, compressed_size, uncompressed_size, width, height
+         FROM pages WHERE book_id = ? ORDER BY page_number",
+    )
+    .bind(&book_id)
+    .fetch_all(&state.db)
+    .await?;
+
+    let entries: Vec<PageManifestEntry> = pages
+        .into_iter()
+        .map(|(page_number, entry_name, compressed_size, uncompressed_size, width, height)| {
+            PageManifestEntry {
+                page: page_number + 1, // 1-indexed for API
+                url: format!("/api/books/{}/pages/{}", book_id, page_number + 1),
+                entry_name,
+                compressed_size,
+                uncompressed_size,
+                width,
+                height,
+            }
+        })
+        .collect();
+
+    Ok(Json(PageManifestResponse {
+        book_id: book_id.clone(),
+        page_count,
+        pages: entries,
+    }))
+}
+
+#[derive(serde::Serialize)]
+pub struct PageManifestResponse {
+    pub book_id: String,
+    pub page_count: i32,
+    pub pages: Vec<PageManifestEntry>,
+}
+
+#[derive(serde::Serialize)]
+pub struct PageManifestEntry {
+    pub page: i32,
+    pub url: String,
+    pub entry_name: String,
+    pub compressed_size: i64,
+    pub uncompressed_size: i64,
+    pub width: Option<i32>,
+    pub height: Option<i32>,
 }

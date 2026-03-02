@@ -164,6 +164,34 @@ export async function updateProgress(
   })
 }
 
+export async function fetchBatchProgress(
+  bookIds: string[],
+): Promise<Record<string, ReadingProgress>> {
+  if (bookIds.length === 0) return {}
+  const data = await request<{ progress: Record<string, ReadingProgress> }>(
+    `/progress/batch?book_ids=${bookIds.join(',')}`,
+  )
+  return data.progress
+}
+
+// ── Preferences ──
+
+export async function fetchPreferences(): Promise<Record<string, unknown>> {
+  const data = await request<{ preferences: Record<string, unknown> }>(
+    '/preferences',
+  )
+  return data.preferences
+}
+
+export async function updatePreferences(
+  preferences: Record<string, unknown>,
+): Promise<void> {
+  await request('/preferences', {
+    method: 'PUT',
+    body: JSON.stringify({ preferences }),
+  })
+}
+
 // ── Profiles ──
 
 export interface Profile {

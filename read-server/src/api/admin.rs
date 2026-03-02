@@ -326,13 +326,22 @@ pub async fn browse_directories(
 
     let mut entries = Vec::new();
 
-    // Add parent directory entry if not root
+    // Add parent directory entry if not at a common path root
+    #[cfg(target_os = "windows")]
+    let is_common_root = false;
+    #[cfg(not(target_os = "windows"))]
+    let common_paths = vec!["/home", "/mnt", "/media", "/opt", "/var"];
+    #[cfg(not(target_os = "windows"))]
+    let is_common_root = common_paths.contains(&base_path.to_string_lossy().as_ref());
+
     if let Some(parent) = base_path.parent() {
-        entries.push(DirectoryEntry {
-            name: "..".to_string(),
-            path: parent.to_string_lossy().to_string(),
-            is_dir: true,
-        });
+        if !is_common_root {
+            entries.push(DirectoryEntry {
+                name: "..".to_string(),
+                path: parent.to_string_lossy().to_string(),
+                is_dir: true,
+            });
+        }
     }
 
     // List subdirectories

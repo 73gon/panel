@@ -47,7 +47,7 @@ function RootComponent() {
 
   return (
     <ThemeProvider>
-      <TooltipProvider delayDuration={300}>
+      <TooltipProvider delay={300}>
         <AppLayout>
           <Outlet />
         </AppLayout>

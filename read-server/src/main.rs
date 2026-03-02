@@ -13,8 +13,8 @@ use axum::http::{HeaderValue, Method};
 use axum::routing::{delete, get, post, put};
 use axum::Router;
 use tokio::sync::RwLock;
-use tower_http::cors::CorsLayer;
 use tower_http::compression::CompressionLayer;
+use tower_http::cors::CorsLayer;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
@@ -146,10 +146,7 @@ async fn main() -> anyhow::Result<()> {
             post(api::progress::migrate_progress),
         )
         // Batch progress (fetch multiple at once)
-        .route(
-            "/api/progress/batch",
-            get(api::progress::batch_progress),
-        )
+        .route("/api/progress/batch", get(api::progress::batch_progress))
         // User preferences
         .route(
             "/api/preferences",

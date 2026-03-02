@@ -8,6 +8,9 @@ use crate::error::AppError;
 use crate::state::AppState;
 use crate::zip::{content_type_for_entry, ZipIndex};
 
+type PageRow = (String, String, String, String, i64, i64, i64, i32);
+type PageManifestRow = (i32, String, i64, i64, Option<i32>, Option<i32>);
+
 pub async fn page(
     State(state): State<AppState>,
     Path((book_id, page_num)): Path<(String, i32)>,
@@ -21,7 +24,7 @@ pub async fn page(
     }
 
     // Single query: book path + page entry data
-    let row: Option<(String, String, String, String, i64, i64, i64, i32)> = sqlx::query_as(
+    let row: Option<PageRow> = sqlx::query_as(
         "SELECT b.path, l.path, b.file_mtime,
                 p.entry_name, p.entry_offset, p.compressed_size,
                 p.uncompressed_size, p.compression
@@ -179,7 +182,7 @@ pub async fn page_manifest(
         AppError::NotFound(format!("Book {} not found", book_id))
     })?;
 
-    let pages: Vec<(i32, String, i64, i64, Option<i32>, Option<i32>)> = sqlx::query_as(
+    let pages: Vec<PageManifestRow> = sqlx::query_as(
         "SELECT page_number, entry_name, compressed_size, uncompressed_size, width, height
          FROM pages WHERE book_id = ? ORDER BY page_number",
     )

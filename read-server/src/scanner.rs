@@ -403,7 +403,11 @@ async fn process_cbz(
             let mut query = String::from(
                 "INSERT INTO pages (book_id, page_number, entry_name, entry_offset, compressed_size, uncompressed_size, compression) VALUES ",
             );
-            let chunk_start_idx = zip_index.pages.iter().position(|p| std::ptr::eq(p, &chunk[0])).unwrap_or(0);
+            let chunk_start_idx = zip_index
+                .pages
+                .iter()
+                .position(|p| std::ptr::eq(p, &chunk[0]))
+                .unwrap_or(0);
             for (j, _page) in chunk.iter().enumerate() {
                 if j > 0 {
                     query.push_str(", ");
@@ -413,7 +417,8 @@ async fn process_cbz(
             let mut q = sqlx::query(&query);
             for (j, page) in chunk.iter().enumerate() {
                 let i = chunk_start_idx + j;
-                q = q.bind(&book_id)
+                q = q
+                    .bind(&book_id)
                     .bind(i as i32)
                     .bind(&page.entry_name)
                     .bind(page.local_header_offset as i64)

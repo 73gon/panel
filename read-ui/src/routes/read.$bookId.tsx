@@ -75,6 +75,9 @@ function ReaderPage() {
   // Load book data
   useEffect(() => {
     let cancelled = false
+    // Clear immediately so the loading skeleton shows during chapter transitions
+    setBook(null)
+    setLoadedPages(new Set())
     async function load() {
       try {
         const detail = await fetchBookDetail(bookId)
@@ -360,12 +363,17 @@ function ReaderPage() {
                 <div
                   key={page}
                   data-page={page}
-                  className="relative flex justify-center"
+                  className="relative w-full"
+                  style={!loadedPages.has(page) ? { aspectRatio: '2/3' } : undefined}
                 >
                   <img
                     src={getPageUrl(bookId, page)}
                     alt={`Page ${page}`}
-                    className="w-full max-w-3xl min-h-[60vw]"
+                    className={`w-full max-w-3xl mx-auto block ${
+                      loadedPages.has(page)
+                        ? 'relative'
+                        : 'absolute inset-0 h-full w-full object-contain opacity-0'
+                    }`}
                     loading={page <= 5 ? 'eager' : 'lazy'}
                     onLoad={() =>
                       setLoadedPages((prev) => new Set(prev).add(page))

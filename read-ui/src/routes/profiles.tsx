@@ -186,11 +186,9 @@ function ProfilesPage() {
                     )}
                   </div>
                   <span className="text-sm font-medium">{profile.name}</span>
-                  {profile.has_pin && (
-                    <span className="text-xs text-muted-foreground">
-                      PIN protected
-                    </span>
-                  )}
+                  <span className={`text-xs ${profile.has_pin ? 'text-muted-foreground' : 'invisible'}`}>
+                    PIN protected
+                  </span>
                 </CardContent>
               </Card>
             </motion.div>
@@ -217,6 +215,7 @@ function ProfilesPage() {
                   />
                 </div>
                 <span className="text-sm font-medium">Guest</span>
+                <span className="invisible text-xs">placeholder</span>
               </CardContent>
             </Card>
           </motion.div>

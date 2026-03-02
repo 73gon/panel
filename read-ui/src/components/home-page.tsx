@@ -55,7 +55,7 @@ function SeriesCard({
       }}
     >
       <Link to="/series/$seriesId" params={{ seriesId: series.id }}>
-        <Card className="group cursor-pointer overflow-hidden border-0 bg-transparent shadow-none transition-transform hover:scale-[1.02]">
+        <Card className="group cursor-pointer overflow-hidden border-0 bg-transparent shadow-none transition-transform hover:scale-[1.02] pt-0">
           <CardContent className="p-0">
             <div className="relative aspect-3/4 w-full overflow-hidden rounded-lg bg-muted">
               {cover ? (

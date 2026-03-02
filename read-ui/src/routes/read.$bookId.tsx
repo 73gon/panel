@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Settings01Icon,
+  Loading03Icon,
 } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -359,24 +360,46 @@ function ReaderPage() {
                 <div
                   key={page}
                   data-page={page}
-                  className="flex justify-center"
+                  className="relative flex justify-center"
                 >
                   <img
                     src={getPageUrl(bookId, page)}
                     alt={`Page ${page}`}
-                    className="w-full max-w-3xl"
-                    loading={page <= 3 ? 'eager' : 'lazy'}
+                    className="w-full max-w-3xl min-h-[60vw]"
+                    loading={page <= 5 ? 'eager' : 'lazy'}
                     onLoad={() =>
                       setLoadedPages((prev) => new Set(prev).add(page))
                     }
-                    onError={(e) => {
-                      ;(e.target as HTMLImageElement).style.display = 'none'
-                    }}
+                    onError={() =>
+                      setLoadedPages((prev) => new Set(prev).add(page))
+                    }
                   />
+                  {/* Spinner overlay while this page is loading */}
+                  {!loadedPages.has(page) && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-muted/20">
+                      <HugeiconsIcon
+                        icon={Loading03Icon}
+                        size={20}
+                        className="animate-spin text-muted-foreground/40"
+                      />
+                    </div>
+                  )}
                 </div>
               ),
             )}
           </div>
+
+          {/* Loading indicator — shown while pages are still loading */}
+          {loadedPages.size < book.page_count && (
+            <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
+              <HugeiconsIcon
+                icon={Loading03Icon}
+                size={14}
+                className="animate-spin"
+              />
+              Loading pages… {loadedPages.size} / {book.page_count}
+            </div>
+          )}
 
           {/* Chapter Navigation (Bottom) */}
           <div className="flex items-center justify-center gap-3 px-4 py-6">

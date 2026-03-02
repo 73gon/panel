@@ -10,8 +10,8 @@ export const getRouter = () => {
     scrollRestoration: true,
     defaultPreloadStaleTime: 30_000,
     defaultPreload: 'viewport',
-    defaultPendingMs: 150,
-    defaultPendingMinMs: 200,
+    defaultPendingMs: 0,
+    defaultPendingMinMs: 300,
   })
 
   return router

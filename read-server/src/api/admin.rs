@@ -296,7 +296,7 @@ pub async fn browse_directories(
     }
 
     // List subdirectories
-    match std::fs::read_dir(base_path) {
+    match std::fs::read_dir(&base_path) {
         Ok(dir_entries) => {
             let mut subdirs: Vec<_> = dir_entries
                 .filter_map(|entry| {

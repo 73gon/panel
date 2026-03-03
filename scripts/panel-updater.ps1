@@ -74,7 +74,7 @@ if (Test-Path $composeFile) {
 Set-Location $COMPOSE_DIR
 Log "Restarting containers..."
 try {
-    $dockerOutput = docker compose up -d 2>&1 | Out-String
+    $dockerOutput = docker compose up -d --remove-orphans 2>&1 | Out-String
     Log $dockerOutput
     Log "Update complete! Now running ${IMAGE}:${tag}"
 } catch {

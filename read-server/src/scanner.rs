@@ -24,6 +24,9 @@ pub async fn scan_libraries(
     _library_roots: &[PathBuf],
     status: &RwLock<ScanStatus>,
 ) {
+    // Resolve data_dir for thumbnail cleanup
+    let data_dir =
+        PathBuf::from(std::env::var("OPENPANEL_DATA_DIR").unwrap_or_else(|_| "./data".to_string()));
     {
         let mut s = status.write().await;
         s.running = true;
@@ -112,7 +115,7 @@ pub async fn scan_libraries(
         }
 
         // Clean up: remove books from DB that no longer exist on disk
-        cleanup_stale_books(pool, lib_id, &found_rel_paths).await;
+        cleanup_stale_books(pool, lib_id, &found_rel_paths, &data_dir).await;
     }
 
     // Clean up empty series (no books left)
@@ -160,11 +163,18 @@ pub async fn rescan_series(pool: &SqlitePool, series_id: &str) -> anyhow::Result
         .fetch_all(pool)
         .await?;
 
+    let data_dir =
+        PathBuf::from(std::env::var("OPENPANEL_DATA_DIR").unwrap_or_else(|_| "./data".to_string()));
+    let thumb_dir = data_dir.join("thumbnails");
+
     for (book_id,) in &old_books {
         sqlx::query("DELETE FROM pages WHERE book_id = ?")
             .bind(book_id)
             .execute(pool)
             .await?;
+        // Delete cached thumbnails
+        let _ = tokio::fs::remove_file(thumb_dir.join(format!("{}.jpg", book_id))).await;
+        let _ = tokio::fs::remove_file(thumb_dir.join(format!("{}.mtime", book_id))).await;
     }
     sqlx::query("DELETE FROM books WHERE series_id = ?")
         .bind(series_id)
@@ -204,7 +214,12 @@ pub async fn rescan_series(pool: &SqlitePool, series_id: &str) -> anyhow::Result
 }
 
 /// Remove books from DB that are no longer on disk.
-async fn cleanup_stale_books(pool: &SqlitePool, library_id: &str, found_paths: &[String]) {
+async fn cleanup_stale_books(
+    pool: &SqlitePool,
+    library_id: &str,
+    found_paths: &[String],
+    data_dir: &Path,
+) {
     let found_set: HashSet<&str> = found_paths.iter().map(|s| s.as_str()).collect();
 
     let db_books: Vec<(String, String)> = match sqlx::query_as(
@@ -223,6 +238,8 @@ async fn cleanup_stale_books(pool: &SqlitePool, library_id: &str, found_paths: &
         }
     };
 
+    let thumb_dir = data_dir.join("thumbnails");
+
     for (book_id, book_path) in &db_books {
         if !found_set.contains(book_path.as_str()) {
             tracing::info!("Removing stale book: {}", book_path);
@@ -230,10 +247,17 @@ async fn cleanup_stale_books(pool: &SqlitePool, library_id: &str, found_paths: &
                 .bind(book_id)
                 .execute(pool)
                 .await;
+            let _ = sqlx::query("DELETE FROM reading_progress WHERE book_id = ?")
+                .bind(book_id)
+                .execute(pool)
+                .await;
             let _ = sqlx::query("DELETE FROM books WHERE id = ?")
                 .bind(book_id)
                 .execute(pool)
                 .await;
+            // Delete cached thumbnail
+            let _ = tokio::fs::remove_file(thumb_dir.join(format!("{}.jpg", book_id))).await;
+            let _ = tokio::fs::remove_file(thumb_dir.join(format!("{}.mtime", book_id))).await;
         }
     }
 }

@@ -13,6 +13,7 @@ use axum::http::{HeaderValue, Method};
 use axum::routing::{delete, get, post, put};
 use axum::Router;
 use tokio::sync::RwLock;
+use tower_http::compression::predicate::{DefaultPredicate, NotForContentType, Predicate};
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
 use tower_http::services::{ServeDir, ServeFile};
@@ -38,7 +39,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
-    tracing::info!("Starting Panel server v{}", env!("CARGO_PKG_VERSION"));
+    tracing::info!("Starting OpenPanel server v{}", env!("CARGO_PKG_VERSION"));
     tracing::info!("Data dir: {}", config.data_dir.display());
     tracing::info!(
         "Library roots: {:?}",
@@ -129,6 +130,15 @@ async fn main() -> anyhow::Result<()> {
             "/api/books/{book_id}/manifest",
             get(api::reader::page_manifest),
         )
+        // Thumbnails
+        .route(
+            "/api/books/{book_id}/thumbnail",
+            get(api::reader::thumbnail),
+        )
+        .route(
+            "/api/series/{series_id}/thumbnail",
+            get(api::reader::series_thumbnail),
+        )
         // Profiles
         .route("/api/profiles", get(api::profile::list_profiles))
         .route(
@@ -179,7 +189,18 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/admin/password", put(api::admin::change_password))
         .route("/api/admin/update", post(api::admin::trigger_update))
         .layer(cors)
-        .layer(CompressionLayer::new().gzip(true).br(true))
+        .layer(
+            CompressionLayer::new().gzip(true).br(true).compress_when(
+                DefaultPredicate::new()
+                    .and(NotForContentType::new("image/jpeg"))
+                    .and(NotForContentType::new("image/png"))
+                    .and(NotForContentType::new("image/webp"))
+                    .and(NotForContentType::new("image/gif"))
+                    .and(NotForContentType::new("image/avif"))
+                    .and(NotForContentType::new("application/zip"))
+                    .and(NotForContentType::new("application/octet-stream")),
+            ),
+        )
         .layer(TraceLayer::new_for_http())
         .with_state(state)
         // Serve static frontend files in production

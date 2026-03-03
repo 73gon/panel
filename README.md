@@ -1,8 +1,8 @@
-# 📚 Panel
+# 📚 OpenPanel
 
 A self-hosted manga and comic book reader — like Jellyfin, but for CBZ files.
 
-**Panel** scans your CBZ comic/manga library, indexes pages from ZIP archives without extracting them, generates thumbnails, and serves a responsive web reader with continuous-scroll and single-page modes, RTL/LTR support, reading progress tracking, and multi-profile support.
+**OpenPanel** scans your CBZ comic/manga library, indexes pages from ZIP archives without extracting them, generates thumbnails, and serves a responsive web reader with continuous-scroll and single-page modes, RTL/LTR support, reading progress tracking, and multi-profile support.
 
 ---
 
@@ -52,8 +52,8 @@ Each subfolder becomes a **series**. CBZ files directly in the root become stand
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/youruser/panel.git
-   cd panel
+   git clone https://github.com/youruser/openpanel.git
+   cd openpanel
    ```
 
 2. **Install frontend dependencies:**
@@ -94,31 +94,29 @@ Each subfolder becomes a **series**. CBZ files directly in the root become stand
 
 ## Configuration
 
-The backend is configured through environment variables (or a `.env` file in the `panel-server/` directory):
+The backend is configured through environment variables (or a `.env` file in the `read-server/` directory):
 
-| Variable                | Default                        | Description                                                                                   |
-| ----------------------- | ------------------------------ | --------------------------------------------------------------------------------------------- |
-| `PORT`                  | `3001`                         | Server port                                                                                   |
-| `DATA_DIR`              | `./data`                       | Where the SQLite database and thumbnails are stored                                           |
-| `DATABASE_URL`          | `sqlite://<DATA_DIR>/panel.db` | SQLite database URL                                                                           |
-| `LIBRARY_ROOTS`         | _(empty)_                      | Comma-separated paths to scan on startup (optional, libraries can also be added via admin UI) |
-| `DEV_MODE`              | `false`                        | Enables CORS for `localhost:5173`                                                             |
-| `LOG_LEVEL`             | `info`                         | Tracing log level (`debug`, `info`, `warn`, `error`)                                          |
-| `ZIP_CACHE_SIZE`        | `200`                          | Number of ZIP indexes to keep in the LRU cache                                                |
-| `THUMB_WIDTH`           | `320`                          | Thumbnail width in pixels                                                                     |
-| `THUMB_QUALITY`         | `80`                           | WebP quality for thumbnails (0–100)                                                           |
-| `ADMIN_TIMEOUT_MINUTES` | `30`                           | Admin session timeout                                                                         |
-| `PUBLIC_URL`            | `http://localhost:3001`        | Public URL (used for CORS in production)                                                      |
-| `SCAN_ON_STARTUP`       | `true`                         | Automatically scan libraries when the server starts                                           |
+| Variable                              | Default                            | Description                                                                                   |
+| ------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------- |
+| `OPENPANEL_PORT`                      | `3001`                             | Server port                                                                                   |
+| `OPENPANEL_DATA_DIR`                  | `./data`                           | Where the SQLite database and thumbnails are stored                                           |
+| `DATABASE_URL`                        | `sqlite://<DATA_DIR>/openpanel.db` | SQLite database URL                                                                           |
+| `OPENPANEL_LIBRARY_ROOTS`             | _(empty)_                          | Comma-separated paths to scan on startup (optional, libraries can also be added via admin UI) |
+| `OPENPANEL_DEV_MODE`                  | `false`                            | Enables CORS for `localhost:5173`                                                             |
+| `OPENPANEL_LOG_LEVEL`                 | `info`                             | Tracing log level (`debug`, `info`, `warn`, `error`)                                          |
+| `OPENPANEL_ZIP_CACHE_SIZE`            | `200`                              | Number of ZIP indexes to keep in the LRU cache                                                |
+| `OPENPANEL_ADMIN_SESSION_TIMEOUT_MIN` | `30`                               | Admin session timeout in minutes                                                              |
+| `OPENPANEL_PUBLIC_URL`                | `http://localhost:3001`            | Public URL (used for CORS in production)                                                      |
+| `OPENPANEL_SCAN_ON_STARTUP`           | `true`                             | Automatically scan libraries when the server starts                                           |
 
 Example `.env`:
 
 ```bash
-PORT=3001
-DATA_DIR=./data
-DEV_MODE=true
-LIBRARY_ROOTS=/home/user/manga,/home/user/comics
-LOG_LEVEL=info
+OPENPANEL_PORT=3001
+OPENPANEL_DATA_DIR=./data
+OPENPANEL_DEV_MODE=true
+OPENPANEL_LIBRARY_ROOTS=/home/user/manga,/home/user/comics
+OPENPANEL_LOG_LEVEL=info
 ```
 
 ---
@@ -131,7 +129,7 @@ LOG_LEVEL=info
 
    ```yaml
    volumes:
-     - panel-data:/data
+     - openpanel-data:/data
      - /your/manga/folder:/libraries/manga:ro
      - /your/comics/folder:/libraries/comics:ro
    ```
@@ -149,7 +147,7 @@ LOG_LEVEL=info
 
 ### With HTTPS (Caddy)
 
-1. Edit `Caddyfile` — replace `panel.example.com` with your domain
+1. Edit `Caddyfile` — replace `openpanel.example.com` with your domain
 2. In `docker-compose.yml`, uncomment the `caddy` service
 3. ```bash
    docker compose up -d
@@ -159,13 +157,13 @@ LOG_LEVEL=info
 ### Build Docker Image Only
 
 ```bash
-docker build -t read .
+docker build -t openpanel .
 docker run -d \
   -p 3001:3001 \
-  -v read-data:/data \
+  -v openpanel-data:/data \
   -v /path/to/manga:/libraries/manga:ro \
-  --name panel \
-  panel
+  --name openpanel \
+  openpanel
 ```
 
 ---
@@ -192,7 +190,7 @@ docker run -d \
 3. **Run:**
    ```bash
    cd read-server
-   DATA_DIR=/var/lib/read PORT=3001 ./target/release/read-server
+   OPENPANEL_DATA_DIR=/var/lib/openpanel OPENPANEL_PORT=3001 ./target/release/openpanel-server
    ```
    The server serves the frontend from `read-ui/dist/` automatically.
 

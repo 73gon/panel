@@ -51,12 +51,14 @@ pub async fn get_progress(
         None
     };
 
-    let progress = row.map(|(book_id, page, is_completed, updated_at)| ProgressResponse {
-        book_id,
-        page: page + 1, // Convert to 1-indexed
-        is_completed: is_completed != 0,
-        updated_at,
-    });
+    let progress = row.map(
+        |(book_id, page, is_completed, updated_at)| ProgressResponse {
+            book_id,
+            page: page + 1, // Convert to 1-indexed
+            is_completed: is_completed != 0,
+            updated_at,
+        },
+    );
 
     Ok(Json(progress))
 }
@@ -181,14 +183,12 @@ pub async fn migrate_progress(
             }
         } else {
             // Move device progress to profile
-            sqlx::query(
-                "UPDATE reading_progress SET profile_id = ?, updated_at = ? WHERE id = ?",
-            )
-            .bind(&profile_id)
-            .bind(&now)
-            .bind(&dp_id)
-            .execute(&state.db)
-            .await?;
+            sqlx::query("UPDATE reading_progress SET profile_id = ?, updated_at = ? WHERE id = ?")
+                .bind(&profile_id)
+                .bind(&now)
+                .bind(&dp_id)
+                .execute(&state.db)
+                .await?;
         }
 
         // Delete the device-local entry
@@ -221,43 +221,64 @@ pub async fn batch_progress(
     let profile_id = extract_profile_id(&state, &headers).await;
     let device_id = extract_device_id(&state, &headers).await;
 
-    let book_ids: Vec<&str> = query.book_ids.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+    let book_ids: Vec<&str> = query
+        .book_ids
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
     let mut progress_map = std::collections::HashMap::new();
 
-    for book_id in &book_ids {
-        let row: Option<(String, i32, i32, String)> = if let Some(pid) = &profile_id {
-            sqlx::query_as(
-                "SELECT book_id, page_number, is_completed, updated_at
-                 FROM reading_progress WHERE profile_id = ? AND book_id = ?",
-            )
-            .bind(pid)
-            .bind(book_id)
-            .fetch_optional(&state.db)
-            .await?
-        } else if let Some(did) = &device_id {
-            sqlx::query_as(
-                "SELECT book_id, page_number, is_completed, updated_at
-                 FROM reading_progress WHERE device_id = ? AND book_id = ? AND profile_id IS NULL",
-            )
-            .bind(did)
-            .bind(book_id)
-            .fetch_optional(&state.db)
-            .await?
-        } else {
-            None
-        };
+    if book_ids.is_empty() {
+        return Ok(Json(BatchProgressResponse {
+            progress: progress_map,
+        }));
+    }
 
-        if let Some((bid, page, is_completed, updated_at)) = row {
-            progress_map.insert(bid.clone(), ProgressResponse {
+    // Build a single IN query for all book_ids
+    let placeholders: String = book_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+
+    let rows: Vec<(String, i32, i32, String)> = if let Some(pid) = &profile_id {
+        let sql = format!(
+            "SELECT book_id, page_number, is_completed, updated_at
+             FROM reading_progress WHERE profile_id = ? AND book_id IN ({})",
+            placeholders
+        );
+        let mut q = sqlx::query_as::<_, (String, i32, i32, String)>(&sql).bind(pid);
+        for bid in &book_ids {
+            q = q.bind(*bid);
+        }
+        q.fetch_all(&state.db).await?
+    } else if let Some(did) = &device_id {
+        let sql = format!(
+            "SELECT book_id, page_number, is_completed, updated_at
+             FROM reading_progress WHERE device_id = ? AND book_id IN ({}) AND profile_id IS NULL",
+            placeholders
+        );
+        let mut q = sqlx::query_as::<_, (String, i32, i32, String)>(&sql).bind(did);
+        for bid in &book_ids {
+            q = q.bind(*bid);
+        }
+        q.fetch_all(&state.db).await?
+    } else {
+        vec![]
+    };
+
+    for (bid, page, is_completed, updated_at) in rows {
+        progress_map.insert(
+            bid.clone(),
+            ProgressResponse {
                 book_id: bid,
                 page: page + 1,
                 is_completed: is_completed != 0,
                 updated_at,
-            });
-        }
+            },
+        );
     }
 
-    Ok(Json(BatchProgressResponse { progress: progress_map }))
+    Ok(Json(BatchProgressResponse {
+        progress: progress_map,
+    }))
 }
 
 // ── Helpers ──
@@ -266,13 +287,12 @@ async fn extract_profile_id(state: &AppState, headers: &HeaderMap) -> Option<Str
     let auth = headers.get("authorization")?.to_str().ok()?;
     let token = auth.strip_prefix("Bearer ")?;
 
-    let row: Option<(String, String)> = sqlx::query_as(
-        "SELECT profile_id, expires_at FROM sessions WHERE token = ?",
-    )
-    .bind(token)
-    .fetch_optional(&state.db)
-    .await
-    .ok()?;
+    let row: Option<(String, String)> =
+        sqlx::query_as("SELECT profile_id, expires_at FROM sessions WHERE token = ?")
+            .bind(token)
+            .fetch_optional(&state.db)
+            .await
+            .ok()?;
 
     let (profile_id, expires_at) = row?;
     // Check expiry
@@ -305,13 +325,11 @@ async fn extract_device_id(state: &AppState, headers: &HeaderMap) -> Option<Stri
         Some(id)
     } else {
         let id = uuid::Uuid::new_v4().to_string();
-        let _ = sqlx::query(
-            "INSERT INTO devices (id, device_fingerprint) VALUES (?, ?)",
-        )
-        .bind(&id)
-        .bind(fingerprint)
-        .execute(&state.db)
-        .await;
+        let _ = sqlx::query("INSERT INTO devices (id, device_fingerprint) VALUES (?, ?)")
+            .bind(&id)
+            .bind(fingerprint)
+            .execute(&state.db)
+            .await;
         Some(id)
     }
 }
@@ -336,10 +354,12 @@ pub async fn get_preferences(
             .fetch_optional(&state.db)
             .await?
     } else if let Some(did) = &device_id {
-        sqlx::query_as("SELECT preferences FROM user_preferences WHERE device_id = ? AND profile_id IS NULL")
-            .bind(did)
-            .fetch_optional(&state.db)
-            .await?
+        sqlx::query_as(
+            "SELECT preferences FROM user_preferences WHERE device_id = ? AND profile_id IS NULL",
+        )
+        .bind(did)
+        .fetch_optional(&state.db)
+        .await?
     } else {
         None
     };

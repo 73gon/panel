@@ -22,7 +22,13 @@ fn extract_year_from_name(name: &str) -> Option<i32> {
             let year_str = year_match.as_str();
             year_str.parse::<i32>().ok()
         })
-        .and_then(|y| if (1900..=2100).contains(&y) { Some(y) } else { None })
+        .and_then(|y| {
+            if (1900..=2100).contains(&y) {
+                Some(y)
+            } else {
+                None
+            }
+        })
 }
 
 #[derive(Serialize)]

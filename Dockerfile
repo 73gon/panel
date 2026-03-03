@@ -21,25 +21,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsqlite3-0 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN useradd -m -s /bin/bash paneluser
+RUN useradd -m -s /bin/bash openpaneluser
 
 WORKDIR /app
 
 # Copy backend binary
-COPY --from=server-build /app/read-server/target/release/panel-server /app/panel-server
+COPY --from=server-build /app/read-server/target/release/openpanel-server /app/openpanel-server
 
 # Copy frontend dist
 COPY --from=web-build /app/web/dist /app/read-ui/dist
 
 # Create data directory
-RUN mkdir -p /data && chown paneluser:paneluser /data
+RUN mkdir -p /data && chown openpaneluser:openpaneluser /data
 
-USER paneluser
+USER openpaneluser
 
-ENV PANEL_PORT=6511
-ENV PANEL_DATA_DIR=/data
-ENV DATABASE_URL=sqlite:///data/panel.db
+ENV OPENPANEL_PORT=6511
+ENV OPENPANEL_DATA_DIR=/data
+ENV DATABASE_URL=sqlite:///data/openpanel.db
 
 EXPOSE 6511
 
-CMD ["/app/panel-server"]
+CMD ["/app/openpanel-server"]

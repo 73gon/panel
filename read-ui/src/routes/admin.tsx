@@ -736,7 +736,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 <Card>
                   <CardContent className="flex items-center justify-between py-4">
                     <div>
-                      <p className="font-medium">Update Panel</p>
+                      <p className="font-medium">Update OpenPanel</p>
                       <p className="text-xs text-muted-foreground">
                         Pull latest code and restart the server
                       </p>

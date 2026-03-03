@@ -345,7 +345,7 @@ function ProfilesPage() {
               className="text-muted-foreground"
             />
             <div className="text-left">
-              <p className="text-sm font-medium">Admin Panel</p>
+              <p className="text-sm font-medium">Admin</p>
               <p className="text-xs text-muted-foreground">
                 Manage libraries, profiles & settings
               </p>

@@ -59,14 +59,23 @@ function SeriesCard({
           <CardContent className="p-0">
             <div className="relative aspect-3/4 w-full overflow-hidden rounded-lg bg-muted">
               {cover ? (
-                <img
-                  src={cover}
-                  alt={series.name}
-                  className={`h-full w-full object-cover transition-all duration-500 group-hover:scale-105 ${
-                    loaded ? 'opacity-100' : 'opacity-0'
-                  }`}
-                  onLoad={() => setLoaded(true)}
-                />
+                <>
+                  {/* Blurred background for uncropped cover */}
+                  <img
+                    src={cover}
+                    alt=""
+                    aria-hidden
+                    className="absolute inset-0 h-full w-full scale-110 object-cover blur-xl brightness-75"
+                  />
+                  <img
+                    src={cover}
+                    alt={series.name}
+                    className={`relative h-full w-full object-contain transition-all duration-500 group-hover:scale-105 ${
+                      loaded ? 'opacity-100' : 'opacity-0'
+                    }`}
+                    onLoad={() => setLoaded(true)}
+                  />
+                </>
               ) : (
                 <div className="flex h-full w-full items-center justify-center">
                   <HugeiconsIcon

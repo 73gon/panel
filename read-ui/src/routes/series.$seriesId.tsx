@@ -24,7 +24,7 @@ import {
   fetchBooks,
   fetchBatchProgress,
   rescanSeries,
-  getPageUrl,
+  getThumbnailUrl,
   type Book,
   type ReadingProgress,
 } from '@/lib/api'
@@ -203,16 +203,25 @@ function SeriesDetailPage() {
         >
           {/* Cover */}
           <div className="relative w-48 shrink-0 self-start md:w-56">
-            <div className="aspect-3/4 overflow-hidden rounded-lg bg-muted shadow-xl">
+            <div className="relative aspect-3/4 overflow-hidden rounded-lg bg-muted shadow-xl">
               {cover ? (
-                <img
-                  src={cover}
-                  alt={seriesName}
-                  className={`h-full w-full object-cover transition-opacity duration-500 ${
-                    coverLoaded ? 'opacity-100' : 'opacity-0'
-                  }`}
-                  onLoad={() => setCoverLoaded(true)}
-                />
+                <>
+                  {/* Blurred background for uncropped cover */}
+                  <img
+                    src={cover}
+                    alt=""
+                    aria-hidden
+                    className="absolute inset-0 h-full w-full scale-110 object-cover blur-xl brightness-75"
+                  />
+                  <img
+                    src={cover}
+                    alt={seriesName}
+                    className={`relative h-full w-full object-contain transition-opacity duration-500 ${
+                      coverLoaded ? 'opacity-100' : 'opacity-0'
+                    }`}
+                    onLoad={() => setCoverLoaded(true)}
+                  />
+                </>
               ) : (
                 <div className="flex h-full w-full items-center justify-center">
                   <HugeiconsIcon
@@ -366,11 +375,19 @@ function SeriesDetailPage() {
                   >
                     <Link to="/read/$bookId" params={{ bookId: book.id }}>
                       <div className="group relative cursor-pointer overflow-hidden rounded-lg border border-border/50 bg-card transition-all hover:border-border hover:shadow-md">
-                        <div className="aspect-3/4 w-full overflow-hidden bg-muted">
+                        <div className="relative aspect-3/4 w-full overflow-hidden bg-muted">
+                          {/* Blurred background for uncropped cover */}
                           <img
-                            src={getPageUrl(book.id, 1)}
+                            src={getThumbnailUrl(book.id)}
+                            alt=""
+                            aria-hidden
+                            className="absolute inset-0 h-full w-full scale-110 object-cover blur-xl brightness-75"
+                            loading="lazy"
+                          />
+                          <img
+                            src={getThumbnailUrl(book.id)}
                             alt={book.title}
-                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            className="relative h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
                             loading="lazy"
                           />
                         </div>

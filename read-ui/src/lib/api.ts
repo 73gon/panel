@@ -358,3 +358,13 @@ export async function browseDirectories(
 export function getPageUrl(bookId: string, page: number): string {
   return `${BASE}/books/${bookId}/pages/${page}`
 }
+
+// ── Thumbnails ──
+
+export function getThumbnailUrl(bookId: string): string {
+  return `${BASE}/books/${bookId}/thumbnail`
+}
+
+export function getSeriesThumbnailUrl(seriesId: string): string {
+  return `${BASE}/series/${seriesId}/thumbnail`
+}

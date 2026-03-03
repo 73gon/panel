@@ -185,6 +185,7 @@ function AdminPage() {
 function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [settings, setSettings] = useState<AdminSettings | null>(null)
   const [scanStatus, setScanStatus] = useState<ScanStatus | null>(null)
+  const [scanError, setScanError] = useState<string | null>(null)
   const [libraries, setLibraries] = useState<LibraryType[]>([])
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [scanning, setScanning] = useState(false)
@@ -255,11 +256,16 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   }, [scanning, loadData])
 
   const handleScan = async () => {
+    setScanError(null)
     try {
       await startScan()
       setScanning(true)
       setScanStatus(null)
-    } catch {}
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Scan failed'
+      setScanError(message)
+      console.error('Scan error:', err)
+    }
   }
 
   const handleAddLibrary = async () => {
@@ -420,6 +426,9 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               <CardContent className="flex items-center justify-between py-4">
                 <div>
                   <p className="font-medium">Scan Libraries</p>
+                  {scanError && (
+                    <p className="text-xs text-destructive">{scanError}</p>
+                  )}
                   {scanStatus && (
                     <p className="text-xs text-muted-foreground">
                       {scanStatus.message}

@@ -136,7 +136,7 @@ export async function rescanSeries(
 ): Promise<{ status: string; books_scanned: number }> {
   return request(`/series/${seriesId}/rescan`, {
     method: 'POST',
-    body: anilistId ? JSON.stringify({ anilist_id: anilistId }) : undefined,
+    body: JSON.stringify(anilistId ? { anilist_id: anilistId } : {}),
   })
 }
 
@@ -435,6 +435,14 @@ export async function setSeriesAnilistId(
   return request(`/series/${seriesId}/metadata`, {
     method: 'PUT',
     body: JSON.stringify({ anilist_id: anilistId }),
+  })
+}
+
+export async function clearSeriesAnilistId(
+  seriesId: string,
+): Promise<SeriesMetadata> {
+  return request(`/series/${seriesId}/metadata`, {
+    method: 'DELETE',
   })
 }
 

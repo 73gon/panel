@@ -135,14 +135,16 @@ pub async fn list_series(
 
     let series = rows
         .into_iter()
-        .map(|(id, name, book_count, book_type, anilist_cover_url)| SeriesItem {
-            id,
-            name: name.clone(),
-            book_count,
-            book_type: book_type.unwrap_or_else(|| "chapter".to_string()),
-            year: extract_year_from_name(&name),
-            anilist_cover_url,
-        })
+        .map(
+            |(id, name, book_count, book_type, anilist_cover_url)| SeriesItem {
+                id,
+                name: name.clone(),
+                book_count,
+                book_type: book_type.unwrap_or_else(|| "chapter".to_string()),
+                year: extract_year_from_name(&name),
+                anilist_cover_url,
+            },
+        )
         .collect();
 
     Ok(Json(SeriesListResponse {
@@ -251,14 +253,16 @@ pub async fn all_series(
 
     let series = rows
         .into_iter()
-        .map(|(id, name, book_count, book_type, anilist_cover_url)| SeriesItem {
-            id,
-            name: name.clone(),
-            book_count,
-            book_type: book_type.unwrap_or_else(|| "chapter".to_string()),
-            year: extract_year_from_name(&name),
-            anilist_cover_url,
-        })
+        .map(
+            |(id, name, book_count, book_type, anilist_cover_url)| SeriesItem {
+                id,
+                name: name.clone(),
+                book_count,
+                book_type: book_type.unwrap_or_else(|| "chapter".to_string()),
+                year: extract_year_from_name(&name),
+                anilist_cover_url,
+            },
+        )
         .collect();
 
     Ok(Json(AllSeriesResponse {
@@ -483,9 +487,7 @@ pub async fn set_series_metadata(
     let media = crate::anilist::fetch_by_id(body.anilist_id)
         .await
         .map_err(|e| AppError::Internal(format!("AniList fetch failed: {}", e)))?
-        .ok_or_else(|| {
-            AppError::NotFound(format!("AniList ID {} not found", body.anilist_id))
-        })?;
+        .ok_or_else(|| AppError::NotFound(format!("AniList ID {} not found", body.anilist_id)))?;
 
     // Save with manual source
     crate::anilist::save_metadata(&state.db, &series_id, &media, "manual")
@@ -514,8 +516,8 @@ pub async fn refresh_series_metadata(
     if source.as_deref() == Some("manual") {
         if let Some(al_id) = existing_id {
             if let Ok(Some(media)) = crate::anilist::fetch_by_id(al_id).await {
-                let _ = crate::anilist::save_metadata(&state.db, &series_id, &media, "manual")
-                    .await;
+                let _ =
+                    crate::anilist::save_metadata(&state.db, &series_id, &media, "manual").await;
             }
             return get_series_metadata(State(state), Path(series_id)).await;
         }
@@ -523,6 +525,29 @@ pub async fn refresh_series_metadata(
 
     // Otherwise, clear and re-fetch by name search
     let _ = crate::anilist::clear_metadata(&state.db, &series_id).await;
+    let _ = crate::anilist::fetch_and_save_for_series(&state.db, &series_id, &name, true).await;
+
+    get_series_metadata(State(state), Path(series_id)).await
+}
+
+pub async fn clear_series_metadata(
+    State(state): State<AppState>,
+    Path(series_id): Path<String>,
+) -> Result<Json<SeriesMetadataResponse>, AppError> {
+    // Verify series exists and get name
+    let row: Option<(String,)> = sqlx::query_as("SELECT name FROM series WHERE id = ?")
+        .bind(&series_id)
+        .fetch_optional(&state.db)
+        .await?;
+
+    let (name,) = row.ok_or_else(|| AppError::NotFound("Series not found".to_string()))?;
+
+    // Clear all metadata
+    crate::anilist::clear_metadata(&state.db, &series_id)
+        .await
+        .map_err(|e| AppError::Internal(format!("Failed to clear metadata: {}", e)))?;
+
+    // Re-fetch by name search (auto mode)
     let _ = crate::anilist::fetch_and_save_for_series(&state.db, &series_id, &name, true).await;
 
     get_series_metadata(State(state), Path(series_id)).await

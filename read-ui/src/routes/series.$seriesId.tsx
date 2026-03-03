@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useState } from 'react'
-import { motion } from 'motion/react'
+import { useState, useRef, useEffect } from 'react'
+import { motion, AnimatePresence } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowLeft,
@@ -15,6 +15,8 @@ import {
   GridViewIcon,
   Menu02Icon,
   Tick01Icon,
+  Settings02Icon,
+  Cancel01Icon,
 } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -29,6 +31,7 @@ import {
   fetchSeriesMetadata,
   refreshSeriesMetadata,
   setSeriesAnilistId,
+  clearSeriesAnilistId,
   getThumbnailUrl,
   type Book,
   type ReadingProgress,
@@ -125,6 +128,26 @@ function SeriesDetailPage() {
   const [rescanning, setRescanning] = useState(false)
   const [anilistIdInput, setAnilistIdInput] = useState('')
   const [settingId, setSettingId] = useState(false)
+  const [showAnilistPopover, setShowAnilistPopover] = useState(false)
+  const popoverRef = useRef<HTMLDivElement>(null)
+
+  const isAdmin = !!sessionStorage.getItem('admin_token')
+
+  // Close popover on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        popoverRef.current &&
+        !popoverRef.current.contains(e.target as Node)
+      ) {
+        setShowAnilistPopover(false)
+      }
+    }
+    if (showAnilistPopover) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showAnilistPopover])
 
   const chapterViewMode = useAppStore((s) => s.chapterViewMode)
   const volumeViewMode = useAppStore((s) => s.volumeViewMode)
@@ -162,8 +185,23 @@ function SeriesDetailPage() {
       setMetadata(freshMeta)
       setCoverLoaded(false)
       setAnilistIdInput('')
+      setShowAnilistPopover(false)
     } catch (err) {
       console.error('Failed to set AniList ID:', err)
+    } finally {
+      setSettingId(false)
+    }
+  }
+
+  const handleResetToAuto = async () => {
+    setSettingId(true)
+    try {
+      const freshMeta = await clearSeriesAnilistId(seriesId)
+      setMetadata(freshMeta)
+      setCoverLoaded(false)
+      setShowAnilistPopover(false)
+    } catch (err) {
+      console.error('Failed to reset AniList ID:', err)
     } finally {
       setSettingId(false)
     }
@@ -328,7 +366,7 @@ function SeriesDetailPage() {
             <p className="text-xs text-muted-foreground/60">
               {books.length} {bookLabel === 'volume' ? 'volumes' : 'chapters'}{' '}
               in library
-              {metadata?.anilist_id && (
+              {isAdmin && metadata?.anilist_id && (
                 <>
                   {' '}
                   · AniList ID: {metadata.anilist_id}
@@ -340,32 +378,6 @@ function SeriesDetailPage() {
                 </>
               )}
             </p>
-
-            {/* AniList ID input */}
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                placeholder="Set AniList ID"
-                value={anilistIdInput}
-                onChange={(e) => setAnilistIdInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSetAnilistId()}
-                className="h-8 w-40 text-xs"
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleSetAnilistId}
-                disabled={settingId || !anilistIdInput.trim()}
-                className="h-8 gap-1 px-2 text-xs"
-              >
-                <HugeiconsIcon
-                  icon={settingId ? Loading03Icon : Tick01Icon}
-                  size={14}
-                  className={settingId ? 'animate-spin' : ''}
-                />
-                {settingId ? 'Setting...' : 'Set'}
-              </Button>
-            </div>
           </div>
         </motion.div>
 
@@ -394,20 +406,101 @@ function SeriesDetailPage() {
               >
                 <HugeiconsIcon icon={GridViewIcon} size={16} />
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleRescan}
-                disabled={rescanning}
-                className="gap-2 text-muted-foreground"
-              >
-                <HugeiconsIcon
-                  icon={rescanning ? Loading03Icon : Refresh}
-                  size={14}
-                  className={rescanning ? 'animate-spin' : ''}
-                />
-                {rescanning ? 'Rescanning...' : 'Rescan'}
-              </Button>
+              {isAdmin && (
+                <>
+                  {/* AniList ID popover */}
+                  <div className="relative" ref={popoverRef}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground"
+                      onClick={() => setShowAnilistPopover(!showAnilistPopover)}
+                      title="Set AniList ID"
+                    >
+                      <HugeiconsIcon icon={Settings02Icon} size={16} />
+                    </Button>
+                    <AnimatePresence>
+                      {showAnilistPopover && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 4, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 4, scale: 0.95 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute right-0 top-full z-50 mt-1 w-64 rounded-lg border border-border bg-popover p-3 shadow-lg"
+                        >
+                          <p className="mb-2 text-xs font-medium text-muted-foreground">
+                            AniList ID
+                            {metadata?.anilist_id_source && (
+                              <span className="ml-1 text-muted-foreground/60">
+                                ({metadata.anilist_id_source})
+                              </span>
+                            )}
+                          </p>
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              placeholder={
+                                metadata?.anilist_id?.toString() || 'Enter ID'
+                              }
+                              value={anilistIdInput}
+                              onChange={(e) =>
+                                setAnilistIdInput(
+                                  e.target.value.replace(/\D/g, ''),
+                                )
+                              }
+                              onKeyDown={(e) =>
+                                e.key === 'Enter' && handleSetAnilistId()
+                              }
+                              className="h-7 flex-1 text-xs"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={handleSetAnilistId}
+                              disabled={settingId || !anilistIdInput.trim()}
+                              title="Set ID"
+                            >
+                              <HugeiconsIcon
+                                icon={settingId ? Loading03Icon : Tick01Icon}
+                                size={14}
+                                className={settingId ? 'animate-spin' : ''}
+                              />
+                            </Button>
+                          </div>
+                          {metadata?.anilist_id_source === 'manual' && (
+                            <button
+                              onClick={handleResetToAuto}
+                              disabled={settingId}
+                              className="mt-2 flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+                            >
+                              <HugeiconsIcon icon={Cancel01Icon} size={12} />
+                              Reset to auto-detect
+                            </button>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRescan}
+                    disabled={rescanning}
+                    className="gap-2 text-muted-foreground"
+                  >
+                    <HugeiconsIcon
+                      icon={rescanning ? Loading03Icon : Refresh}
+                      size={14}
+                      className={rescanning ? 'animate-spin' : ''}
+                    />
+                    {rescanning ? 'Rescanning...' : 'Rescan'}
+                  </Button>
+                </>
+              )}
             </div>
           </div>
           {viewMode === 'grid' ? (

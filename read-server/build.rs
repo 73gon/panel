@@ -21,9 +21,16 @@ fn main() {
         std::env::var("BUILD_CHANNEL").unwrap_or_else(|_| "dev".to_string());
     println!("cargo:rustc-env=BUILD_CHANNEL={}", channel);
 
+    // Display version (e.g. "nightly-20260303-abc1234" or "v1.0.0")
+    // Falls back to Cargo package version if not set
+    let display_version = std::env::var("BUILD_VERSION")
+        .unwrap_or_else(|_| format!("dev-{}", &commit));
+    println!("cargo:rustc-env=BUILD_VERSION={}", display_version);
+
     // Re-run when the git HEAD changes (e.g. new commit)
     println!("cargo:rerun-if-changed=.git/HEAD");
     println!("cargo:rerun-if-changed=.git/refs/heads");
     println!("cargo:rerun-if-env-changed=BUILD_CHANNEL");
     println!("cargo:rerun-if-env-changed=BUILD_COMMIT");
+    println!("cargo:rerun-if-env-changed=BUILD_VERSION");
 }

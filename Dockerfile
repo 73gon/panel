@@ -10,6 +10,7 @@ RUN npm run build
 FROM rust:latest AS server-build
 
 ARG BUILD_VERSION=0.0.0-dev
+ARG BUILD_CARGO_VERSION=0.0.0
 ARG BUILD_CHANNEL=dev
 ARG BUILD_COMMIT=unknown
 
@@ -18,11 +19,12 @@ COPY read-server/ ./read-server/
 
 # Inject version into Cargo.toml so CARGO_PKG_VERSION reflects the release
 WORKDIR /app/read-server
-RUN sed -i "s/^version = .*/version = \"${BUILD_VERSION#v}\"/" Cargo.toml
+RUN sed -i "s/^version = .*/version = \"${BUILD_CARGO_VERSION}\"/" Cargo.toml
 
-# Also make channel + commit available at compile time (alongside build.rs git approach)
+# Also make channel + commit + display version available at compile time
 ENV BUILD_CHANNEL=${BUILD_CHANNEL}
 ENV BUILD_COMMIT=${BUILD_COMMIT}
+ENV BUILD_VERSION=${BUILD_VERSION}
 
 RUN cargo build --release
 

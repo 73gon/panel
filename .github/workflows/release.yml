@@ -34,14 +34,17 @@ jobs:
         run: |
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
             VERSION="${{ github.ref_name }}"          # e.g. v1.0.0
+            CARGO_VERSION="${VERSION#v}"              # strip leading v
             CHANNEL="stable"
             echo "is_release=true" >> "$GITHUB_OUTPUT"
           else
             VERSION="nightly-$(date -u +%Y%m%d)-${GITHUB_SHA::7}"
+            CARGO_VERSION="0.0.0-nightly.$(date -u +%Y%m%d)"
             CHANNEL="nightly"
             echo "is_release=false" >> "$GITHUB_OUTPUT"
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "cargo_version=$CARGO_VERSION" >> "$GITHUB_OUTPUT"
           echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
           echo "sha_short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
@@ -64,6 +67,7 @@ jobs:
           labels: ${{ steps.docker_meta.outputs.labels }}
           build-args: |
             BUILD_VERSION=${{ steps.meta.outputs.version }}
+            BUILD_CARGO_VERSION=${{ steps.meta.outputs.cargo_version }}
             BUILD_CHANNEL=${{ steps.meta.outputs.channel }}
             BUILD_COMMIT=${{ steps.meta.outputs.sha_short }}
           cache-from: type=gha

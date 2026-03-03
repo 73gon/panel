@@ -55,15 +55,15 @@ function SeriesCard({
       }}
     >
       <Link to="/series/$seriesId" params={{ seriesId: series.id }}>
-        <Card className="group cursor-pointer overflow-hidden border-0 bg-transparent shadow-none transition-transform hover:scale-[1.01] pt-0">
+        <Card className="group cursor-pointer overflow-hidden border-0 bg-transparent shadow-none transition-transform hover:scale-[1.02] pt-0">
           <CardContent className="p-0">
-            <div className="relative aspect-5.5/8 w-full overflow-hidden rounded-lg bg-background transition-colors group-hover:border group-hover:border-foreground">
+            <div className="relative aspect-5.5/8 w-full overflow-hidden rounded-lg bg-background">
               {cover ? (
                 <>
                   <img
                     src={cover}
                     alt={series.name}
-                    className={`relative h-full w-full object-contain transition-all duration-500 group-hover:scale-105 ${
+                    className={`relative h-full w-full object-contain transition-all duration-200 group-hover:scale-102 ${
                       loaded ? 'opacity-100' : 'opacity-0'
                     }`}
                     onLoad={() => setLoaded(true)}

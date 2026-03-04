@@ -4,9 +4,9 @@
 
 $ErrorActionPreference = "Stop"
 
-$PANEL_DIR = if ($env:OPENPANEL_DIR) { $env:OPENPANEL_DIR } else { "C:\panel" }
+$PANEL_DIR = if ($env:OPENPANEL_DIR) { $env:OPENPANEL_DIR } else { "C:\openpanel" }
 $TASK_NAME = "OpenPanelUpdater"
-$SCRIPT_PATH = "$PANEL_DIR\scripts\panel-updater.ps1"
+$SCRIPT_PATH = "$PANEL_DIR\scripts\openpanel-updater.ps1"
 
 # Verify prerequisites
 if (-not (Test-Path $SCRIPT_PATH)) {

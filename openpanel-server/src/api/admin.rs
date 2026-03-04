@@ -420,6 +420,54 @@ pub async fn remove_library(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[derive(Deserialize)]
+pub struct UpdateLibraryRequest {
+    pub name: Option<String>,
+    pub path: Option<String>,
+}
+
+pub async fn update_library(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(library_id): axum::extract::Path<String>,
+    Json(body): Json<UpdateLibraryRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    require_admin_token(&state, &headers).await?;
+
+    // Verify library exists
+    let existing: Option<(String, String)> =
+        sqlx::query_as("SELECT name, path FROM libraries WHERE id = ?")
+            .bind(&library_id)
+            .fetch_optional(&state.db)
+            .await?;
+
+    let (current_name, current_path) =
+        existing.ok_or_else(|| AppError::NotFound("Library not found".to_string()))?;
+
+    let new_name = body.name.unwrap_or(current_name);
+    let new_path = body.path.unwrap_or(current_path);
+
+    // Validate path exists if changed
+    let path = std::path::Path::new(&new_path);
+    if !path.exists() {
+        return Err(AppError::BadRequest(format!(
+            "Path does not exist: {}",
+            new_path
+        )));
+    }
+
+    sqlx::query("UPDATE libraries SET name = ?, path = ? WHERE id = ?")
+        .bind(&new_name)
+        .bind(&new_path)
+        .bind(&library_id)
+        .execute(&state.db)
+        .await?;
+
+    Ok(Json(
+        serde_json::json!({ "id": library_id, "name": new_name, "path": new_path }),
+    ))
+}
+
 // ── Profile management ──
 
 #[derive(Deserialize)]
@@ -624,6 +672,116 @@ pub async fn trigger_update(
             "Update triggered. Pulling {} channel and restarting...",
             channel
         ),
+    }))
+}
+
+// ── Check for Updates ──
+
+#[derive(Serialize)]
+pub struct UpdateCheckResponse {
+    pub update_available: bool,
+    pub current_version: String,
+    pub current_commit: String,
+    pub latest_version: Option<String>,
+    pub channel: String,
+}
+
+pub async fn check_update(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<UpdateCheckResponse>, AppError> {
+    require_admin_token(&state, &headers).await?;
+
+    let channel = get_setting(&state.db, "update_channel")
+        .await
+        .unwrap_or_else(|| "stable".to_string());
+
+    let github_repo = env!("GITHUB_REPO");
+    let current_version = env!("BUILD_VERSION");
+    let current_commit = env!("GIT_COMMIT_SHA");
+
+    // If no GitHub repo is configured, we can't check for updates
+    if github_repo.is_empty() {
+        return Ok(Json(UpdateCheckResponse {
+            update_available: false,
+            current_version: current_version.to_string(),
+            current_commit: current_commit.to_string(),
+            latest_version: None,
+            channel,
+        }));
+    }
+
+    let url = if channel == "stable" {
+        format!(
+            "https://api.github.com/repos/{}/releases/latest",
+            github_repo
+        )
+    } else {
+        format!(
+            "https://api.github.com/repos/{}/releases/tags/nightly",
+            github_repo
+        )
+    };
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(&url)
+        .header("User-Agent", "OpenPanel-Server")
+        .header("Accept", "application/vnd.github.v3+json")
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(format!("GitHub API error: {}", e)))?;
+
+    if !resp.status().is_success() {
+        tracing::warn!("GitHub API returned {} for update check", resp.status());
+        return Ok(Json(UpdateCheckResponse {
+            update_available: false,
+            current_version: current_version.to_string(),
+            current_commit: current_commit.to_string(),
+            latest_version: None,
+            channel,
+        }));
+    }
+
+    let release: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| AppError::Internal(format!("Failed to parse GitHub response: {}", e)))?;
+
+    let latest_version = release["tag_name"]
+        .as_str()
+        .or_else(|| release["name"].as_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    // Determine if an update is available by comparing versions
+    let update_available = if channel == "nightly" {
+        // For nightly: the release body contains the full commit SHA
+        // Body format: "...\n- Commit: <full_sha>\n..."
+        let body = release["body"].as_str().unwrap_or("");
+        let latest_commit = body
+            .lines()
+            .find(|l| l.contains("Commit:"))
+            .and_then(|l| l.split("Commit:").nth(1))
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default();
+
+        // Compare: current short commit vs latest full commit
+        !latest_commit.is_empty() && !latest_commit.starts_with(current_commit)
+    } else {
+        // For stable: compare tag version strings
+        let tag = release["tag_name"].as_str().unwrap_or("");
+        let tag_clean = tag.trim_start_matches('v');
+        let current_clean = current_version.trim_start_matches('v');
+        !tag.is_empty() && tag_clean != current_clean
+    };
+
+    Ok(Json(UpdateCheckResponse {
+        update_available,
+        current_version: current_version.to_string(),
+        current_commit: current_commit.to_string(),
+        latest_version: Some(latest_version),
+        channel,
     }))
 }
 

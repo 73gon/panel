@@ -1,4 +1,4 @@
-// Backend API client for the Read server
+// Backend API client for the OpenPanel server
 
 const BASE = '/api'
 
@@ -70,6 +70,7 @@ export function ensureDeviceId(): string {
 export interface Library {
   id: string
   name: string
+  path: string
   series_count: number
 }
 
@@ -259,6 +260,8 @@ export interface ScanStatus {
   total: number
   errors: number
   message: string
+  current_file: string
+  phase: string
 }
 
 export async function fetchAdminStatus(): Promise<AdminStatus> {
@@ -317,6 +320,16 @@ export async function deleteLibrary(libraryId: string): Promise<void> {
   await request(`/admin/libraries/${libraryId}`, { method: 'DELETE' })
 }
 
+export async function updateLibrary(
+  libraryId: string,
+  data: { name?: string; path?: string },
+): Promise<{ id: string; name: string; path: string }> {
+  return request(`/admin/libraries/${libraryId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
 export async function createProfile(
   name: string,
   pin?: string,
@@ -349,6 +362,18 @@ export async function triggerUpdate(): Promise<{
   message: string
 }> {
   return request('/admin/update', { method: 'POST' })
+}
+
+export interface UpdateCheckResult {
+  update_available: boolean
+  current_version: string
+  current_commit: string
+  latest_version: string | null
+  channel: string
+}
+
+export async function checkForUpdates(): Promise<UpdateCheckResult> {
+  return request('/admin/check-update')
 }
 
 export interface VersionInfo {

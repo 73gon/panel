@@ -90,7 +90,7 @@ export const useAppStore = create<AppState>()(
       setVolumeViewMode: (mode) => set({ volumeViewMode: mode }),
     }),
     {
-      name: 'read-app-store',
+      name: 'openpanel-store',
       partialize: (state) => ({
         profile: state.profile,
         profileToken: state.profileToken,

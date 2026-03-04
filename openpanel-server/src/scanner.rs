@@ -15,6 +15,8 @@ pub struct ScanStatus {
     pub total: usize,
     pub errors: usize,
     pub message: String,
+    pub current_file: String,
+    pub phase: String,
 }
 
 /// Scan all library roots and populate the database.
@@ -31,8 +33,11 @@ pub async fn scan_libraries(
         let mut s = status.write().await;
         s.running = true;
         s.scanned = 0;
+        s.total = 0;
         s.errors = 0;
         s.message = "Starting scan...".to_string();
+        s.current_file = String::new();
+        s.phase = "starting".to_string();
     }
 
     // Read library roots from the database
@@ -85,7 +90,8 @@ pub async fn scan_libraries(
         {
             let mut s = status.write().await;
             s.total += cbz_files.len();
-            s.message = format!("Found {} CBZ files in {}", cbz_files.len(), root.display());
+            s.message = format!("Found {} files in {}", cbz_files.len(), root.display());
+            s.phase = "indexing".to_string();
         }
 
         // Collect all relative paths we found on disk for this library
@@ -103,18 +109,34 @@ pub async fn scan_libraries(
                 Ok(_) => {
                     let mut s = status.write().await;
                     s.scanned += 1;
-                    s.message = format!("Scanned: {}", cbz_path.display());
+                    s.current_file = cbz_path
+                        .file_name()
+                        .map(|f| f.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    s.message = format!("Processing: {}", cbz_path.display());
+                    s.phase = "scanning".to_string();
                 }
                 Err(e) => {
                     tracing::error!("Error scanning {}: {}", cbz_path.display(), e);
                     let mut s = status.write().await;
                     s.errors += 1;
                     s.scanned += 1;
+                    s.current_file = cbz_path
+                        .file_name()
+                        .map(|f| f.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    s.phase = "scanning".to_string();
                 }
             }
         }
 
         // Clean up: remove books from DB that no longer exist on disk
+        {
+            let mut s = status.write().await;
+            s.phase = "cleanup".to_string();
+            s.message = "Cleaning up removed files...".to_string();
+            s.current_file = String::new();
+        }
         cleanup_stale_books(pool, lib_id, &found_rel_paths, &data_dir).await;
     }
 
@@ -126,6 +148,8 @@ pub async fn scan_libraries(
     {
         let mut s = status.write().await;
         s.running = false;
+        s.phase = "complete".to_string();
+        s.current_file = String::new();
         s.message = format!("Scan complete. {} scanned, {} errors", s.scanned, s.errors);
     }
 

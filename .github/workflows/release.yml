@@ -70,6 +70,7 @@ jobs:
             BUILD_CARGO_VERSION=${{ steps.meta.outputs.cargo_version }}
             BUILD_CHANNEL=${{ steps.meta.outputs.channel }}
             BUILD_COMMIT=${{ steps.meta.outputs.sha_short }}
+            GITHUB_REPOSITORY=${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

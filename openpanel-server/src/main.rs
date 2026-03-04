@@ -194,7 +194,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .route(
             "/api/admin/libraries/{library_id}",
-            delete(api::admin::remove_library),
+            delete(api::admin::remove_library).put(api::admin::update_library),
         )
         .route("/api/admin/profiles", post(api::admin::create_profile))
         .route(
@@ -203,6 +203,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .route("/api/admin/password", put(api::admin::change_password))
         .route("/api/admin/update", post(api::admin::trigger_update))
+        .route("/api/admin/check-update", get(api::admin::check_update))
         .layer(cors)
         .layer(
             CompressionLayer::new().gzip(true).br(true).compress_when(
@@ -220,8 +221,8 @@ async fn main() -> anyhow::Result<()> {
         .with_state(state)
         // Serve static frontend files in production
         .fallback_service(
-            ServeDir::new("read-ui/dist")
-                .not_found_service(ServeFile::new("read-ui/dist/index.html")),
+            ServeDir::new("openpanel-ui/dist")
+                .not_found_service(ServeFile::new("openpanel-ui/dist/index.html")),
         );
 
     let addr = format!("0.0.0.0:{}", config.port);

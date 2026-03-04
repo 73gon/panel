@@ -59,14 +59,14 @@ Each subfolder becomes a **series**. CBZ files directly in the root become stand
 2. **Install frontend dependencies:**
 
    ```bash
-   cd read-ui
+   cd openpanel-ui
    bun install        # or: npm install
    ```
 
 3. **Start the backend:**
 
    ```bash
-   cd read-server
+   cd openpanel-server
    cargo run
    ```
 
@@ -75,7 +75,7 @@ Each subfolder becomes a **series**. CBZ files directly in the root become stand
 4. **Start the frontend dev server** (in a separate terminal):
 
    ```bash
-   cd read-ui
+   cd openpanel-ui
    bun run dev        # or: npm run dev
    ```
 
@@ -94,7 +94,7 @@ Each subfolder becomes a **series**. CBZ files directly in the root become stand
 
 ## Configuration
 
-The backend is configured through environment variables (or a `.env` file in the `read-server/` directory):
+The backend is configured through environment variables (or a `.env` file in the `openpanel-server/` directory):
 
 | Variable                              | Default                            | Description                                                                                   |
 | ------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------- |
@@ -173,26 +173,26 @@ docker run -d \
 1. **Build the frontend:**
 
    ```bash
-   cd read-ui
+   cd openpanel-ui
    bun install           # or: npm ci
    bun run build         # or: npm run build
    ```
 
-   This outputs static files to `read-ui/dist/`.
+   This outputs static files to `openpanel-ui/dist/`.
 
 2. **Build the backend:**
 
    ```bash
-   cd read-server
+   cd openpanel-server
    cargo build --release
    ```
 
 3. **Run:**
    ```bash
-   cd read-server
+   cd openpanel-server
    OPENPANEL_DATA_DIR=/var/lib/openpanel OPENPANEL_PORT=3001 ./target/release/openpanel-server
    ```
-   The server serves the frontend from `read-ui/dist/` automatically.
+   The server serves the frontend from `openpanel-ui/dist/` automatically.
 
 ---
 
@@ -214,7 +214,7 @@ docker run -d \
 - **Frontend:** React 19 + TypeScript + Vite, TanStack Router, Zustand, shadcn (lyra style with Base UI), Tailwind v4.
 - **CBZ reading:** ZIP central directory is parsed once and cached in an LRU cache. Individual pages are read by seeking to the entry offset — no full extraction.
 - **Auth model:** Three tiers — guest (device ID), profiles (Bearer token), admin (session token).
-- **Metadata:** Cover images and series info fetched from Anilist and cached persistently in IndexedDB (no repeated API calls).
+- **Metadata:** Cover images and series info fetched from AniList and cached server-side in SQLite.
 
 ---
 

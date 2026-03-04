@@ -27,10 +27,37 @@ fn main() {
         .unwrap_or_else(|_| format!("dev-{}", &commit));
     println!("cargo:rustc-env=BUILD_VERSION={}", display_version);
 
+    // GitHub repository (owner/repo) for update checks
+    let github_repo = std::env::var("GITHUB_REPOSITORY")
+        .or_else(|_| {
+            // Try extracting from git remote origin
+            Command::new("git")
+                .args(["remote", "get-url", "origin"])
+                .output()
+                .ok()
+                .filter(|o| o.status.success())
+                .and_then(|o| String::from_utf8(o.stdout).ok())
+                .map(|url| {
+                    let url = url.trim().trim_end_matches(".git");
+                    if let Some(path) = url.strip_prefix("https://github.com/") {
+                        path.to_string()
+                    } else if let Some(path) = url.strip_prefix("git@github.com:") {
+                        path.to_string()
+                    } else {
+                        String::new()
+                    }
+                })
+                .filter(|s| !s.is_empty())
+                .ok_or(std::env::VarError::NotPresent)
+        })
+        .unwrap_or_default();
+    println!("cargo:rustc-env=GITHUB_REPO={}", github_repo);
+
     // Re-run when the git HEAD changes (e.g. new commit)
     println!("cargo:rerun-if-changed=.git/HEAD");
     println!("cargo:rerun-if-changed=.git/refs/heads");
     println!("cargo:rerun-if-env-changed=BUILD_CHANNEL");
     println!("cargo:rerun-if-env-changed=BUILD_COMMIT");
     println!("cargo:rerun-if-env-changed=BUILD_VERSION");
+    println!("cargo:rerun-if-env-changed=GITHUB_REPOSITORY");
 }

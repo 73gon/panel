@@ -1,6 +1,6 @@
 services:
   openpanel:
-    image: ghcr.io/73gon/panel:latest
+    image: ghcr.io/73gon/openpanel:latest
     container_name: openpanel
     restart: unless-stopped
     ports:

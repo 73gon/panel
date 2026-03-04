@@ -35,6 +35,7 @@ fn extract_year_from_name(name: &str) -> Option<i32> {
 pub struct LibraryResponse {
     pub id: String,
     pub name: String,
+    pub path: String,
     pub series_count: i64,
 }
 
@@ -46,8 +47,8 @@ pub struct LibrariesResponse {
 pub async fn list_libraries(
     State(state): State<AppState>,
 ) -> Result<Json<LibrariesResponse>, AppError> {
-    let rows: Vec<(String, String, i64)> = sqlx::query_as(
-        "SELECT l.id, l.name, COUNT(s.id) as series_count
+    let rows: Vec<(String, String, String, i64)> = sqlx::query_as(
+        "SELECT l.id, l.name, l.path, COUNT(s.id) as series_count
          FROM libraries l
          LEFT JOIN series s ON s.library_id = l.id
          GROUP BY l.id
@@ -58,9 +59,10 @@ pub async fn list_libraries(
 
     let libraries = rows
         .into_iter()
-        .map(|(id, name, series_count)| LibraryResponse {
+        .map(|(id, name, path, series_count)| LibraryResponse {
             id,
             name,
+            path,
             series_count,
         })
         .collect();
@@ -115,6 +117,7 @@ pub async fn list_series(
         .fetch_one(&state.db)
         .await?;
 
+    #[allow(clippy::type_complexity)]
     let rows: Vec<(String, String, i64, Option<String>, Option<String>)> = sqlx::query_as(
         "SELECT s.id, s.name, COUNT(b.id) as book_count,
                 (SELECT CASE WHEN b2.title LIKE 'Volume%' THEN 'volume' ELSE 'chapter' END
@@ -235,6 +238,7 @@ pub async fn all_series(
         .fetch_one(&state.db)
         .await?;
 
+    #[allow(clippy::type_complexity)]
     let rows: Vec<(String, String, i64, Option<String>, Option<String>)> = sqlx::query_as(
         "SELECT s.id, s.name, COUNT(b.id) as book_count,
                 (SELECT CASE WHEN b2.title LIKE 'Volume%' THEN 'volume' ELSE 'chapter' END

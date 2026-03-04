@@ -1,5 +1,5 @@
 ﻿import { createFileRoute } from '@tanstack/react-router'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -12,6 +12,9 @@ import {
   Add,
   Loading03Icon,
   Download04Icon,
+  PencilEdit02Icon,
+  Tick02Icon,
+  Cancel01Icon,
 } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -39,15 +42,18 @@ import {
   fetchLibraries,
   createLibrary,
   deleteLibrary,
+  updateLibrary,
   fetchProfiles,
   createProfile,
   deleteProfile,
   changeAdminPassword,
   triggerUpdate,
   fetchVersion,
+  checkForUpdates,
   browseDirectories,
   type AdminStatus,
   type VersionInfo,
+  type UpdateCheckResult,
   type AdminSettings,
   type ScanStatus,
   type Library as LibraryType,
@@ -198,6 +204,12 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [addLibOpen, setAddLibOpen] = useState(false)
   const [addingLib, setAddingLib] = useState(false)
 
+  // Edit library state
+  const [editLibId, setEditLibId] = useState<string | null>(null)
+  const [editLibName, setEditLibName] = useState('')
+  const [editLibPath, setEditLibPath] = useState('')
+  const [savingLib, setSavingLib] = useState(false)
+
   // Directory browser state
   const [browserOpen, setBrowserOpen] = useState(false)
   const [browserPath, setBrowserPath] = useState('')
@@ -222,6 +234,12 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [updating, setUpdating] = useState(false)
   const [updateMsg, setUpdateMsg] = useState('')
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null)
+  const [updateCheck, setUpdateCheck] = useState<UpdateCheckResult | null>(null)
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
+  const [updatePhase, setUpdatePhase] = useState<
+    'idle' | 'triggered' | 'restarting' | 'success' | 'failed'
+  >('idle')
+  const updatePollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const loadData = useCallback(async () => {
     try {
@@ -235,6 +253,9 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       setLibraries(libs)
       setProfiles(profs)
       if (ver) setVersionInfo(ver)
+
+      // Check for updates in background
+      checkForUpdates().then(setUpdateCheck).catch(() => {})
     } catch (err) {
       console.error('Failed to load admin data:', err)
     }
@@ -256,7 +277,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           loadData()
         }
       } catch {}
-    }, 2000)
+    }, 1000)
     return () => clearInterval(interval)
   }, [scanning, loadData])
 
@@ -319,6 +340,28 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     } catch {}
   }
 
+  const handleEditLibrary = (lib: { id: string; name: string; path: string }) => {
+    setEditLibId(lib.id)
+    setEditLibName(lib.name)
+    setEditLibPath(lib.path)
+  }
+
+  const handleSaveLibrary = async () => {
+    if (!editLibId) return
+    setSavingLib(true)
+    try {
+      await updateLibrary(editLibId, {
+        name: editLibName,
+        path: editLibPath,
+      })
+      setEditLibId(null)
+      loadData()
+    } catch {
+    } finally {
+      setSavingLib(false)
+    }
+  }
+
   const handleAddProfile = async () => {
     if (!newProfName) return
     setAddingProf(true)
@@ -355,18 +398,95 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     }
   }
 
+  const handleCheckUpdate = async () => {
+    setCheckingUpdate(true)
+    try {
+      const result = await checkForUpdates()
+      setUpdateCheck(result)
+    } catch {
+      setUpdateMsg('Failed to check for updates')
+    } finally {
+      setCheckingUpdate(false)
+    }
+  }
+
   const handleUpdate = async () => {
     setUpdating(true)
     setUpdateMsg('')
+    setUpdatePhase('idle')
+    const preVersion = versionInfo
     try {
-      const result = await triggerUpdate()
-      setUpdateMsg(result.message)
+      await triggerUpdate()
+      setUpdatePhase('triggered')
+      setUpdateMsg('Update triggered — waiting for updater to pick up...')
+
+      // Start polling for server restart
+      let serverWentDown = false
+      let elapsed = 0
+      const pollInterval = 3000
+      const maxWait = 300000 // 5 minutes
+
+      if (updatePollRef.current) clearInterval(updatePollRef.current)
+      updatePollRef.current = setInterval(async () => {
+        elapsed += pollInterval
+        if (elapsed > maxWait) {
+          clearInterval(updatePollRef.current!)
+          updatePollRef.current = null
+          setUpdatePhase('failed')
+          setUpdateMsg(
+            'Update is taking longer than expected. The updater may still be working — check back in a few minutes.',
+          )
+          setUpdating(false)
+          return
+        }
+
+        try {
+          const ver = await fetchVersion()
+          if (serverWentDown) {
+            // Server came back after restart
+            clearInterval(updatePollRef.current!)
+            updatePollRef.current = null
+            setVersionInfo(ver)
+
+            if (preVersion && ver.commit !== preVersion.commit) {
+              setUpdatePhase('success')
+              setUpdateMsg(`Updated to ${ver.version}`)
+            } else {
+              setUpdatePhase('success')
+              setUpdateMsg(
+                `Server restarted (${ver.version}). Already on latest.`,
+              )
+            }
+            setUpdating(false)
+            setUpdateCheck(null) // Clear stale check
+          } else if (elapsed > 15000) {
+            // After 15s without going down, updater might not have picked it up
+            setUpdateMsg(
+              'Waiting for host updater to pull the new image...',
+            )
+          }
+        } catch {
+          // Server is down — it's restarting
+          if (!serverWentDown) {
+            serverWentDown = true
+            setUpdatePhase('restarting')
+            setUpdateMsg('Server is restarting...')
+          }
+        }
+      }, pollInterval)
     } catch {
       setUpdateMsg('Failed to trigger update')
-    } finally {
+      setUpdatePhase('failed')
       setUpdating(false)
     }
   }
+
+  // Cleanup update polling on unmount
+  useEffect(() => {
+    return () => {
+      if (updatePollRef.current) clearInterval(updatePollRef.current)
+    }
+  }, [])
 
   const handleSettingChange = async (
     key: keyof AdminSettings,
@@ -428,54 +548,174 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           <TabsContent value="libraries" className="space-y-4">
             {/* Scan Button */}
             <Card>
-              <CardContent className="flex items-center justify-between py-4">
-                <div>
-                  <p className="font-medium">Scan Libraries</p>
-                  {scanError && (
-                    <p className="text-xs text-destructive">{scanError}</p>
-                  )}
-                  {scanStatus && (
-                    <p className="text-xs text-muted-foreground">
-                      {scanStatus.message}
-                    </p>
-                  )}
+              <CardContent className="space-y-3 py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Scan Libraries</p>
+                    {scanError && (
+                      <p className="text-xs text-destructive">{scanError}</p>
+                    )}
+                  </div>
+                  <Button
+                    onClick={handleScan}
+                    disabled={scanning}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    {scanning && (
+                      <HugeiconsIcon
+                        icon={Loading03Icon}
+                        size={14}
+                        className="animate-spin"
+                      />
+                    )}
+                    {scanning ? 'Scanning...' : 'Scan Now'}
+                  </Button>
                 </div>
-                <Button
-                  onClick={handleScan}
-                  disabled={scanning}
-                  size="sm"
-                  className="gap-2"
-                >
-                  {scanning && (
-                    <HugeiconsIcon
-                      icon={Loading03Icon}
-                      size={14}
-                      className="animate-spin"
-                    />
-                  )}
-                  {scanning ? 'Scanning...' : 'Scan Now'}
-                </Button>
+
+                {scanning && scanStatus && (
+                  <div className="space-y-2">
+                    {/* Progress bar */}
+                    {scanStatus.total > 0 && (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>
+                            {scanStatus.phase === 'cleanup'
+                              ? 'Cleaning up...'
+                              : `${scanStatus.scanned} / ${scanStatus.total}`}
+                          </span>
+                          <span className="flex items-center gap-2">
+                            {scanStatus.errors > 0 && (
+                              <span className="text-destructive">
+                                {scanStatus.errors} error
+                                {scanStatus.errors !== 1 ? 's' : ''}
+                              </span>
+                            )}
+                            {scanStatus.phase === 'scanning' &&
+                              `${Math.round((scanStatus.scanned / scanStatus.total) * 100)}%`}
+                          </span>
+                        </div>
+                        <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
+                          <div
+                            className="bg-primary h-full rounded-full transition-all duration-300 ease-out"
+                            style={{
+                              width: `${scanStatus.total > 0 ? Math.round((scanStatus.scanned / scanStatus.total) * 100) : 0}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Current file */}
+                    {scanStatus.current_file && (
+                      <p
+                        className="truncate text-xs text-muted-foreground"
+                        title={scanStatus.message}
+                      >
+                        {scanStatus.current_file}
+                      </p>
+                    )}
+
+                    {/* Phase message when no file */}
+                    {!scanStatus.current_file && scanStatus.message && (
+                      <p className="text-xs text-muted-foreground">
+                        {scanStatus.message}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Show completion message when not scanning */}
+                {!scanning && scanStatus && scanStatus.phase === 'complete' && (
+                  <p className="text-xs text-muted-foreground">
+                    {scanStatus.message}
+                  </p>
+                )}
               </CardContent>
             </Card>
 
             {/* Library List */}
             {libraries.map((lib) => (
               <Card key={lib.id}>
-                <CardContent className="flex items-center justify-between py-4">
-                  <div>
-                    <p className="font-medium">{lib.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {lib.series_count} series
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
-                    onClick={() => handleDeleteLibrary(lib.id)}
-                  >
-                    <HugeiconsIcon icon={Delete} size={14} />
-                  </Button>
+                <CardContent className="py-4">
+                  {editLibId === lib.id ? (
+                    /* Edit mode */
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Name</Label>
+                        <Input
+                          value={editLibName}
+                          onChange={(e) => setEditLibName(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Path</Label>
+                        <Input
+                          value={editLibPath}
+                          onChange={(e) => setEditLibPath(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditLibId(null)}
+                          className="gap-1"
+                        >
+                          <HugeiconsIcon icon={Cancel01Icon} size={14} />
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleSaveLibrary}
+                          disabled={savingLib}
+                          className="gap-1"
+                        >
+                          {savingLib ? (
+                            <HugeiconsIcon
+                              icon={Loading03Icon}
+                              size={14}
+                              className="animate-spin"
+                            />
+                          ) : (
+                            <HugeiconsIcon icon={Tick02Icon} size={14} />
+                          )}
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Display mode */
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{lib.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {lib.path}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {lib.series_count} series
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleEditLibrary(lib)}
+                        >
+                          <HugeiconsIcon icon={PencilEdit02Icon} size={14} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteLibrary(lib.id)}
+                        >
+                          <HugeiconsIcon icon={Delete} size={14} />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -766,9 +1006,20 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   <CardContent className="space-y-4 py-4">
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
-                        <p className="font-medium">Update OpenPanel</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">Update OpenPanel</p>
+                          {updateCheck?.update_available && updatePhase === 'idle' && (
+                            <Badge variant="default" className="text-xs">
+                              Update available
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground">
-                          Pull the latest release and restart the server
+                          {updatePhase === 'idle' && 'Pull the latest release and restart the server'}
+                          {updatePhase === 'triggered' && 'Waiting for host updater...'}
+                          {updatePhase === 'restarting' && 'Server is restarting...'}
+                          {updatePhase === 'success' && 'Update complete'}
+                          {updatePhase === 'failed' && 'Update may still be in progress'}
                         </p>
                         {versionInfo && (
                           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -796,27 +1047,63 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                             >
                               {versionInfo.commit}
                             </span>
+                            {updateCheck?.update_available &&
+                              updateCheck.latest_version && (
+                                <span className="text-xs text-muted-foreground">
+                                  → {updateCheck.latest_version}
+                                </span>
+                              )}
                           </div>
                         )}
                       </div>
-                      <Button
-                        onClick={handleUpdate}
-                        disabled={updating}
-                        size="sm"
-                        variant="outline"
-                        className="gap-2"
-                      >
-                        {updating ? (
-                          <HugeiconsIcon
-                            icon={Loading03Icon}
-                            size={14}
-                            className="animate-spin"
-                          />
-                        ) : (
-                          <HugeiconsIcon icon={Download04Icon} size={14} />
+                      <div className="flex items-center gap-2">
+                        {updatePhase === 'idle' && !updating && (
+                          <Button
+                            onClick={handleCheckUpdate}
+                            disabled={checkingUpdate}
+                            size="sm"
+                            variant="ghost"
+                            className="gap-1 text-xs"
+                          >
+                            {checkingUpdate && (
+                              <HugeiconsIcon
+                                icon={Loading03Icon}
+                                size={12}
+                                className="animate-spin"
+                              />
+                            )}
+                            Check
+                          </Button>
                         )}
-                        {updating ? 'Updating...' : 'Update'}
-                      </Button>
+                        <Button
+                          onClick={handleUpdate}
+                          disabled={updating || updatePhase === 'success'}
+                          size="sm"
+                          variant={
+                            updateCheck?.update_available
+                              ? 'default'
+                              : 'outline'
+                          }
+                          className="gap-2"
+                        >
+                          {updating ? (
+                            <HugeiconsIcon
+                              icon={Loading03Icon}
+                              size={14}
+                              className="animate-spin"
+                            />
+                          ) : (
+                            <HugeiconsIcon icon={Download04Icon} size={14} />
+                          )}
+                          {updating
+                            ? updatePhase === 'restarting'
+                              ? 'Restarting...'
+                              : 'Updating...'
+                            : updatePhase === 'success'
+                              ? 'Done'
+                              : 'Update'}
+                        </Button>
+                      </div>
                     </div>
 
                     <Separator />
@@ -836,12 +1123,15 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         </span>
                         <Switch
                           checked={settings.update_channel === 'nightly'}
-                          onCheckedChange={(v) =>
+                          onCheckedChange={(v) => {
                             handleSettingChange(
                               'update_channel',
                               v ? 'nightly' : 'stable',
                             )
-                          }
+                            // Re-check for updates when channel changes
+                            setUpdateCheck(null)
+                            setTimeout(handleCheckUpdate, 500)
+                          }}
                         />
                         <span className="text-xs text-muted-foreground">
                           Nightly
@@ -850,7 +1140,9 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                     </div>
 
                     {updateMsg && (
-                      <p className="text-xs text-muted-foreground">
+                      <p
+                        className={`text-xs ${updatePhase === 'success' ? 'text-green-600 dark:text-green-400' : updatePhase === 'failed' ? 'text-yellow-600 dark:text-yellow-400' : 'text-muted-foreground'}`}
+                      >
                         {updateMsg}
                       </p>
                     )}

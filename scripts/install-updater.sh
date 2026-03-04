@@ -13,7 +13,7 @@ if [[ "$(uname -s)" == MINGW* ]] || [[ "$(uname -s)" == MSYS* ]] || [[ "$(uname 
 fi
 
 USER_HOME=$(eval echo ~$SUDO_USER)
-PANEL_DIR="${OPENPANEL_DIR:-$USER_HOME/panel}"
+PANEL_DIR="${OPENPANEL_DIR:-$USER_HOME/openpanel}"
 
 # Verify docker is available
 if ! docker info >/dev/null 2>&1; then
@@ -25,7 +25,7 @@ echo "OpenPanel dir: $PANEL_DIR"
 echo "User: $SUDO_USER"
 
 # Install the updater script
-cp "$PANEL_DIR/scripts/panel-updater.sh" /usr/local/bin/openpanel-updater
+cp "$PANEL_DIR/scripts/openpanel-updater.sh" /usr/local/bin/openpanel-updater
 chmod +x /usr/local/bin/openpanel-updater
 
 # Create systemd service

@@ -1,6 +1,9 @@
 # Build
+/openpanel-server/target/
 /read-server/target/
+/openpanel-ui/node_modules/
 /read-ui/node_modules/
+/openpanel-ui/dist/
 /read-ui/dist/
 
 # Runtime data

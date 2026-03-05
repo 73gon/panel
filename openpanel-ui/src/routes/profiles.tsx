@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -9,6 +9,7 @@ import {
   GridViewIcon,
   Menu02Icon,
   Logout01Icon,
+  ShieldKeyIcon,
 } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -116,11 +117,32 @@ function AuthPage() {
 
           <Separator className="my-4" />
 
+          {/* Admin link – mobile only (desktop has sidebar) */}
+          {user.is_admin && (
+            <Link
+              to="/admin"
+              className="mb-2 flex w-full items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent md:hidden"
+            >
+              <HugeiconsIcon
+                icon={ShieldKeyIcon}
+                size={20}
+                className="text-muted-foreground"
+              />
+              <div className="text-left">
+                <p className="text-sm font-medium">Admin Settings</p>
+                <p className="text-xs text-muted-foreground">
+                  Manage libraries and users
+                </p>
+              </div>
+            </Link>
+          )}
+
           <h2 className="mb-3 text-lg font-semibold">Settings</h2>
           <div className="space-y-2">
+            {/* Theme toggle \u2013 mobile only (desktop has sidebar toggle) */}
             <button
               onClick={toggleTheme}
-              className="flex w-full items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent"
+              className="flex w-full items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent md:hidden"
             >
               <HugeiconsIcon
                 icon={theme === 'dark' ? Sun01Icon : Moon02Icon}

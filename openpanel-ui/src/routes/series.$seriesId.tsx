@@ -520,7 +520,7 @@ function SeriesDetailPage() {
 
         {/* Chapter List */}
         <section>
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-3">
               <h2 className="text-lg font-semibold">
                 {displayMode === 'chapters'
@@ -555,11 +555,11 @@ function SeriesDetailPage() {
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 overflow-x-auto">
               <Button
                 variant="ghost"
                 size="icon"
-                className={`h-8 w-8 ${viewMode === 'list' ? 'text-primary' : 'text-muted-foreground'}`}
+                className={`h-8 w-8 shrink-0 ${viewMode === 'list' ? 'text-primary' : 'text-muted-foreground'}`}
                 onClick={() => setViewMode('list')}
               >
                 <HugeiconsIcon icon={Menu02Icon} size={16} />
@@ -567,7 +567,7 @@ function SeriesDetailPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className={`h-8 w-8 ${viewMode === 'grid' ? 'text-primary' : 'text-muted-foreground'}`}
+                className={`h-8 w-8 shrink-0 ${viewMode === 'grid' ? 'text-primary' : 'text-muted-foreground'}`}
                 onClick={() => setViewMode('grid')}
               >
                 <HugeiconsIcon icon={GridViewIcon} size={16} />

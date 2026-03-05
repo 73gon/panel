@@ -389,7 +389,7 @@ function ReaderPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 relative"
+                className={`h-7 w-7 relative ${showBookmarks ? 'bg-accent' : ''}`}
                 onClick={(e) => {
                   e.stopPropagation()
                   setShowBookmarks((p) => !p)
@@ -399,7 +399,7 @@ function ReaderPage() {
                 <HugeiconsIcon
                   icon={BookmarkAdd01Icon}
                   size={14}
-                  className={isCurrentPageBookmarked ? 'text-primary' : ''}
+                  className={isCurrentPageBookmarked || showBookmarks ? 'text-primary' : ''}
                 />
                 {bookmarks.length > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
@@ -413,14 +413,14 @@ function ReaderPage() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7"
+                  className={`h-7 w-7 ${showToc ? 'bg-accent' : ''}`}
                   onClick={(e) => {
                     e.stopPropagation()
                     setShowToc((p) => !p)
                     setShowBookmarks(false)
                   }}
                 >
-                  <HugeiconsIcon icon={LeftToRightListNumberIcon} size={14} />
+                  <HugeiconsIcon icon={LeftToRightListNumberIcon} size={14} className={showToc ? 'text-primary' : ''} />
                 </Button>
               )}
 

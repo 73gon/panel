@@ -78,7 +78,7 @@ function RootComponent() {
               <Link
                 key={l.to}
                 to={l.to}
-                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground ${
+                className={`px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground ${
                   location.pathname === l.to
                     ? 'bg-accent text-accent-foreground'
                     : 'text-muted-foreground'
@@ -91,7 +91,7 @@ function RootComponent() {
               href="https://github.com/openreader/openpanel"
               target="_blank"
               rel="noopener noreferrer"
-              className="ml-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              className="ml-2 px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             >
               GitHub
             </a>
@@ -116,7 +116,7 @@ function RootComponent() {
               <Link
                 key={l.to}
                 to={l.to}
-                className="block rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent"
+                className="block px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent"
                 onClick={() => setMobileOpen(false)}
               >
                 {l.label}
@@ -126,7 +126,7 @@ function RootComponent() {
               href="https://github.com/openreader/openpanel"
               target="_blank"
               rel="noopener noreferrer"
-              className="block rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent"
+              className="block px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent"
             >
               GitHub
             </a>

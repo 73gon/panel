@@ -29,7 +29,7 @@ const toc = [
 
 function Code({ children }: { children: string }) {
   return (
-    <code className="rounded bg-accent px-1.5 py-0.5 text-sm font-mono text-foreground">
+    <code className="bg-accent px-1.5 py-0.5 text-sm font-mono text-foreground">
       {children}
     </code>
   )
@@ -37,7 +37,7 @@ function Code({ children }: { children: string }) {
 
 function Pre({ children }: { children: string }) {
   return (
-    <pre className="overflow-x-auto rounded-lg border border-border bg-accent/60 p-4 text-sm leading-relaxed font-mono">
+    <pre className="overflow-x-auto border border-border bg-accent/60 p-4 text-sm leading-relaxed font-mono">
       {children}
     </pre>
   )
@@ -81,7 +81,7 @@ function DocsPage() {
             <a
               key={item.id}
               href={`#${item.id}`}
-              className="block rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="block px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               {item.label}
             </a>
@@ -93,17 +93,17 @@ function DocsPage() {
       <div className="mb-8 lg:hidden">
         <button
           onClick={() => setTocOpen((p) => !p)}
-          className="w-full rounded-lg border border-border px-4 py-2.5 text-left text-sm font-medium"
+          className="w-full border border-border px-4 py-2.5 text-left text-sm font-medium"
         >
           {tocOpen ? 'Hide' : 'Show'} Table of Contents
         </button>
         {tocOpen && (
-          <nav className="mt-2 space-y-1 rounded-lg border border-border bg-card p-3">
+          <nav className="mt-2 space-y-1 border border-border bg-card p-3">
             {toc.map((item) => (
               <a
                 key={item.id}
                 href={`#${item.id}`}
-                className="block rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent"
+                className="block px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent"
                 onClick={() => setTocOpen(false)}
               >
                 {item.label}

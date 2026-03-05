@@ -78,11 +78,11 @@ function HomePage() {
       {/* Hero */}
       <section className="relative overflow-hidden">
         <div className="mx-auto max-w-6xl px-6 py-24 text-center md:py-36">
-          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-accent">
+          <div className="mx-auto mb-6 flex size-30 items-center justify-center">
             <img
               src="/logo-light-transparent.png"
               alt="OpenPanel"
-              className="h-14 w-14"
+              className="size-30"
             />
           </div>
           <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight md:text-6xl">
@@ -96,7 +96,7 @@ function HomePage() {
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <Link
               to="/docs"
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              className="inline-flex items-center gap-2  bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
               Get Started
               <HugeiconsIcon icon={ArrowRight01Icon} size={16} />
@@ -105,7 +105,7 @@ function HomePage() {
               href="https://github.com/openreader/openpanel"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg border border-border px-6 py-3 text-sm font-semibold transition-colors hover:bg-accent"
+              className="inline-flex items-center gap-2  border border-border px-6 py-3 text-sm font-semibold transition-colors hover:bg-accent"
             >
               View on GitHub
             </a>
@@ -120,7 +120,7 @@ function HomePage() {
       <section className="border-y border-border/40 bg-accent/30">
         <div className="mx-auto max-w-6xl px-6 py-16 md:py-20">
           <div className="grid gap-8 md:grid-cols-3">
-            <div className="rounded-xl border border-border bg-card p-6">
+            <div className="border border-border bg-card p-6">
               <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Backend
               </p>
@@ -130,7 +130,7 @@ function HomePage() {
                 central directories are parsed once and cached in an LRU cache.
               </p>
             </div>
-            <div className="rounded-xl border border-border bg-card p-6">
+            <div className="border border-border bg-card p-6">
               <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Frontend
               </p>
@@ -140,7 +140,7 @@ function HomePage() {
                 PWA support and service worker caching.
               </p>
             </div>
-            <div className="rounded-xl border border-border bg-card p-6">
+            <div className="border border-border bg-card p-6">
               <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Storage
               </p>
@@ -168,9 +168,9 @@ function HomePage() {
           {features.map((f) => (
             <div
               key={f.title}
-              className="group rounded-xl border border-border bg-card p-6 transition-colors hover:border-primary/40"
+              className="group border border-border bg-card p-6 transition-colors hover:border-primary/40"
             >
-              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-primary">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center bg-accent text-primary">
                 <HugeiconsIcon icon={f.icon} size={20} />
               </div>
               <h3 className="mb-2 font-semibold">{f.title}</h3>
@@ -194,7 +194,7 @@ function HomePage() {
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <Link
               to="/docs"
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              className="inline-flex items-center gap-2 bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
               Read the Docs
               <HugeiconsIcon icon={ArrowRight01Icon} size={16} />

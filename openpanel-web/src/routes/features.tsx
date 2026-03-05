@@ -155,9 +155,9 @@ function FeaturesPage() {
               {section.features.map((f) => (
                 <div
                   key={f.title}
-                  className="rounded-xl border border-border bg-card p-6"
+                  className="border border-border bg-card p-6"
                 >
-                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-primary">
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center bg-accent text-primary">
                     <HugeiconsIcon icon={f.icon} size={20} />
                   </div>
                   <h3 className="mb-2 font-semibold">{f.title}</h3>

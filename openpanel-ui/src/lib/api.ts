@@ -544,6 +544,7 @@ export interface VersionInfo {
   version: string
   commit: string
   channel: string
+  startup_time: number
 }
 
 export async function fetchVersion(): Promise<VersionInfo> {

@@ -330,7 +330,7 @@ function AdminDashboard() {
       setUpdateMsg('Update scheduled — host updater will pick this up shortly.')
       let serverWentDown = false
       let elapsed = 0
-      const pollInterval = 2000
+      const pollInterval = 1000
       const maxWait = 300000
       if (updatePollRef.current) clearInterval(updatePollRef.current)
       updatePollRef.current = setInterval(async () => {
@@ -345,7 +345,16 @@ function AdminDashboard() {
         }
         try {
           const ver = await fetchVersion()
-          if (serverWentDown) {
+          // Primary: startup_time changed (reliable, works even for sub-second restarts)
+          const startupChanged =
+            preVersion &&
+            ver.startup_time != null &&
+            preVersion.startup_time != null &&
+            ver.startup_time !== 0 &&
+            ver.startup_time !== preVersion.startup_time
+          // Fallback: server went down then came back (for old images without startup_time)
+          const cameBack = serverWentDown
+          if (startupChanged || cameBack) {
             clearInterval(updatePollRef.current!)
             updatePollRef.current = null
             setVersionInfo(ver)

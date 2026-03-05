@@ -29,6 +29,13 @@ use state::AppState;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Capture process startup time for restart detection
+    let startup_ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    api::admin::STARTUP_TIME.set(startup_ts).ok();
+
     // Load .env if present
     dotenvy::dotenv().ok();
 

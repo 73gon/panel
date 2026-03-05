@@ -9,11 +9,15 @@ use crate::state::AppState;
 
 // -- Version --
 
+/// Captured once when the process starts; changes on every restart.
+pub static STARTUP_TIME: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+
 #[derive(Serialize)]
 pub struct VersionInfo {
     pub version: &'static str,
     pub commit: &'static str,
     pub channel: &'static str,
+    pub startup_time: u64,
 }
 
 pub async fn get_version() -> Json<VersionInfo> {
@@ -21,6 +25,7 @@ pub async fn get_version() -> Json<VersionInfo> {
         version: env!("BUILD_VERSION"),
         commit: env!("GIT_COMMIT_SHA"),
         channel: env!("BUILD_CHANNEL"),
+        startup_time: *STARTUP_TIME.get().unwrap_or(&0),
     })
 }
 

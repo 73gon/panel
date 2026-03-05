@@ -93,6 +93,9 @@ Log "Stopping existing container '$CONTAINER_NAME'..."
 docker stop $CONTAINER_NAME 2>&1 | Out-Null
 docker rm $CONTAINER_NAME 2>&1 | Out-Null
 
+# Brief pause so the frontend polling reliably catches the downtime window
+Start-Sleep -Seconds 4
+
 Log "Starting updated container..."
 $dockerOutput = docker compose up -d --remove-orphans 2>$null
 if ($LASTEXITCODE -ne 0) {

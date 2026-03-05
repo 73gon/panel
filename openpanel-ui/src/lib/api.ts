@@ -534,6 +534,7 @@ export interface UpdateCheckResult {
   current_commit: string
   latest_version: string | null
   channel: string
+  error?: string
 }
 
 export async function checkForUpdates(): Promise<UpdateCheckResult> {

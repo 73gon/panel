@@ -76,6 +76,21 @@ async fn main() -> anyhow::Result<()> {
         auth_rate_limiter: Arc::new(state::RateLimiter::new(10, 60)),
     };
 
+    // Log server startup
+    api::admin::log_admin_event(
+        &pool,
+        "info",
+        "server",
+        &format!(
+            "Server started (v{}, commit {}, channel {})",
+            env!("BUILD_VERSION"),
+            env!("GIT_COMMIT_SHA"),
+            env!("BUILD_CHANNEL"),
+        ),
+        None,
+    )
+    .await;
+
     // Run initial scan if configured
     if config.scan_on_startup {
         let pool_clone = pool.clone();

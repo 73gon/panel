@@ -103,6 +103,18 @@ pub async fn update_settings(
     };
     set_setting(&state.db, "update_channel", channel).await?;
 
+    log_admin_event(
+        &state.db,
+        "info",
+        "settings",
+        &format!(
+            "Settings updated (remote={}, scan_on_startup={}, channel={})",
+            body.remote_enabled, body.scan_on_startup, channel
+        ),
+        None,
+    )
+    .await;
+
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -783,6 +795,8 @@ pub struct UpdateCheckResponse {
     pub current_commit: String,
     pub latest_version: Option<String>,
     pub channel: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 pub async fn check_update(
@@ -800,12 +814,22 @@ pub async fn check_update(
     let current_commit = env!("GIT_COMMIT_SHA");
 
     if github_repo.is_empty() {
+        tracing::warn!("GITHUB_REPO is empty — update checks disabled");
+        log_admin_event(
+            &state.db,
+            "warn",
+            "update",
+            "Update check skipped: GITHUB_REPO not configured at build time",
+            None,
+        )
+        .await;
         return Ok(Json(UpdateCheckResponse {
             update_available: false,
             current_version: current_version.to_string(),
             current_commit: current_commit.to_string(),
             latest_version: None,
             channel,
+            error: Some("Repository not configured".to_string()),
         }));
     }
 
@@ -831,13 +855,20 @@ pub async fn check_update(
         .map_err(|e| AppError::Internal(format!("GitHub API error: {}", e)))?;
 
     if !resp.status().is_success() {
-        tracing::warn!("GitHub API returned {} for update check", resp.status());
+        let status = resp.status();
+        let msg = format!(
+            "GitHub API returned {} for update check (url={})",
+            status, url
+        );
+        tracing::warn!("{}", msg);
+        log_admin_event(&state.db, "warn", "update", &msg, None).await;
         return Ok(Json(UpdateCheckResponse {
             update_available: false,
             current_version: current_version.to_string(),
             current_commit: current_commit.to_string(),
             latest_version: None,
             channel,
+            error: Some(format!("GitHub API returned {}", status)),
         }));
     }
 
@@ -868,12 +899,27 @@ pub async fn check_update(
         !tag.is_empty() && tag_clean != current_clean
     };
 
+    if update_available {
+        log_admin_event(
+            &state.db,
+            "info",
+            "update",
+            &format!(
+                "Update available: {} (current: {}, commit: {})",
+                latest_version, current_version, current_commit
+            ),
+            None,
+        )
+        .await;
+    }
+
     Ok(Json(UpdateCheckResponse {
         update_available,
         current_version: current_version.to_string(),
         current_commit: current_commit.to_string(),
         latest_version: Some(latest_version),
         channel,
+        error: None,
     }))
 }
 

@@ -309,10 +309,20 @@ function AdminDashboard() {
 
   const handleCheckUpdate = async () => {
     setCheckingUpdate(true)
+    setUpdateMsg('')
+    setUpdatePhase('idle')
     try {
       const result = await checkForUpdates()
       setUpdateCheck(result)
+      if (result.error) {
+        setUpdatePhase('failed')
+        setUpdateMsg(`Update check failed: ${result.error}`)
+      } else if (!result.update_available) {
+        setUpdatePhase('success')
+        setUpdateMsg('Already up to date.')
+      }
     } catch {
+      setUpdatePhase('failed')
       setUpdateMsg('Failed to check for updates')
     } finally {
       setCheckingUpdate(false)
@@ -323,6 +333,30 @@ function AdminDashboard() {
     setUpdating(true)
     setUpdateMsg('')
     setUpdatePhase('idle')
+
+    // Check for updates first before triggering
+    try {
+      const result = await checkForUpdates()
+      setUpdateCheck(result)
+      if (result.error) {
+        setUpdateMsg(`Update check failed: ${result.error}`)
+        setUpdatePhase('failed')
+        setUpdating(false)
+        return
+      }
+      if (!result.update_available) {
+        setUpdateMsg('Already up to date.')
+        setUpdatePhase('success')
+        setUpdating(false)
+        return
+      }
+    } catch {
+      setUpdateMsg('Failed to check for updates')
+      setUpdatePhase('failed')
+      setUpdating(false)
+      return
+    }
+
     const preVersion = versionInfo
     try {
       await triggerUpdate()

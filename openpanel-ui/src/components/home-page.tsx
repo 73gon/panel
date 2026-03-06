@@ -56,7 +56,7 @@ function SeriesCard({ series, index }: { series: Series; index: number }) {
                 <img
                   src={cover}
                   alt={series.name}
-                  className={`relative h-full w-full object-contain transition-all duration-200 group-hover:scale-102 ${
+                  className={`relative h-full w-full object-cover transition-all duration-200 group-hover:scale-102 ${
                     loaded ? 'opacity-100' : 'opacity-0'
                   }`}
                   onLoad={() => setLoaded(true)}

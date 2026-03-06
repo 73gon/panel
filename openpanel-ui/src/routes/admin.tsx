@@ -373,7 +373,9 @@ function AdminDashboard() {
           clearInterval(updatePollRef.current!)
           updatePollRef.current = null
           setUpdatePhase('failed')
-          setUpdateMsg('Update is taking too long — check the updater log on the host.')
+          setUpdateMsg(
+            'Update is taking too long — check the updater log on the host.',
+          )
           setUpdating(false)
           return
         }
@@ -396,7 +398,9 @@ function AdminDashboard() {
               const shortOld = preVersion.commit.slice(0, 7)
               const shortNew = ver.commit.slice(0, 7)
               setUpdatePhase('success')
-              setUpdateMsg(`Updated: ${shortOld} → ${shortNew} (v${ver.version})`)
+              setUpdateMsg(
+                `Updated: ${shortOld} → ${shortNew} (v${ver.version})`,
+              )
             } else {
               setUpdatePhase('success')
               setUpdateMsg(`Server restarted on v${ver.version}`)
@@ -406,7 +410,9 @@ function AdminDashboard() {
           } else if (elapsed > 60000) {
             setUpdateMsg('Still waiting — this may take a minute...')
           } else if (elapsed > 20000) {
-            setUpdateMsg('Host updater is running — server will restart shortly...')
+            setUpdateMsg(
+              'Host updater is running — server will restart shortly...',
+            )
           }
         } catch {
           if (!serverWentDown) {
@@ -490,7 +496,12 @@ function AdminDashboard() {
       >
         <h1 className="mb-6 text-2xl font-bold">Admin</h1>
 
-        <Tabs value={tab} onValueChange={(v) => navigate({ to: '/admin', search: { tab: v }, replace: true })}>
+        <Tabs
+          value={tab}
+          onValueChange={(v) =>
+            navigate({ to: '/admin', search: { tab: v }, replace: true })
+          }
+        >
           <TabsList className="mb-6 w-full">
             <TabsTrigger value="libraries" className="flex-1">
               <HugeiconsIcon icon={Library} size={14} className="mr-1.5" />
@@ -513,11 +524,7 @@ function AdminDashboard() {
               Settings
             </TabsTrigger>
             <TabsTrigger value="logs" className="flex-1">
-              <HugeiconsIcon
-                icon={Audit01Icon}
-                size={14}
-                className="mr-1.5"
-              />
+              <HugeiconsIcon icon={Audit01Icon} size={14} className="mr-1.5" />
               Logs
             </TabsTrigger>
           </TabsList>
@@ -1077,31 +1084,42 @@ function AdminDashboard() {
                         </span>
                       </div>
                     </div>
-                    {(updating || updatePhase === 'success') && updatePhase !== 'idle' && (() => {
-                      const steps = ['triggered', 'restarting', 'success'] as const
-                      const labels = ['Scheduled', 'Restarting', 'Done']
-                      const current = steps.indexOf(updatePhase as typeof steps[number])
-                      return (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          {steps.map((step, i) => {
-                            const isDone = i < current
-                            const isActive = i === current
-                            return (
-                              <span key={step} className="flex items-center gap-1">
+                    {(updating || updatePhase === 'success') &&
+                      updatePhase !== 'idle' &&
+                      (() => {
+                        const steps = [
+                          'triggered',
+                          'restarting',
+                          'success',
+                        ] as const
+                        const labels = ['Scheduled', 'Restarting', 'Done']
+                        const current = steps.indexOf(
+                          updatePhase as (typeof steps)[number],
+                        )
+                        return (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            {steps.map((step, i) => {
+                              const isDone = i < current
+                              const isActive = i === current
+                              return (
                                 <span
-                                  className={`font-medium ${isDone ? 'text-green-600 dark:text-green-400' : isActive ? 'text-foreground' : 'opacity-40'}`}
+                                  key={step}
+                                  className="flex items-center gap-1"
                                 >
-                                  {labels[i]}
+                                  <span
+                                    className={`font-medium ${isDone ? 'text-green-600 dark:text-green-400' : isActive ? 'text-foreground' : 'opacity-40'}`}
+                                  >
+                                    {labels[i]}
+                                  </span>
+                                  {i < steps.length - 1 && (
+                                    <span className="opacity-30">→</span>
+                                  )}
                                 </span>
-                                {i < steps.length - 1 && (
-                                  <span className="opacity-30">→</span>
-                                )}
-                              </span>
-                            )
-                          })}
-                        </div>
-                      )
-                    })()}
+                              )
+                            })}
+                          </div>
+                        )
+                      })()}
                     {updateMsg && (
                       <p
                         className={`text-xs ${updatePhase === 'success' ? 'text-green-600 dark:text-green-400' : updatePhase === 'failed' ? 'text-yellow-600 dark:text-yellow-400' : 'text-muted-foreground'}`}
@@ -1215,10 +1233,18 @@ function AdminDashboard() {
                     <table className="w-full text-xs">
                       <thead className="sticky top-0 z-10">
                         <tr className="border-b bg-muted/90 backdrop-blur-sm">
-                          <th className="px-3 py-2 text-left font-medium">Time</th>
-                          <th className="px-3 py-2 text-left font-medium">Level</th>
-                          <th className="px-3 py-2 text-left font-medium">Category</th>
-                          <th className="px-3 py-2 text-left font-medium">Message</th>
+                          <th className="px-3 py-2 text-left font-medium">
+                            Time
+                          </th>
+                          <th className="px-3 py-2 text-left font-medium">
+                            Level
+                          </th>
+                          <th className="px-3 py-2 text-left font-medium">
+                            Category
+                          </th>
+                          <th className="px-3 py-2 text-left font-medium">
+                            Message
+                          </th>
                         </tr>
                       </thead>
                       <tbody>

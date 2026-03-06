@@ -135,40 +135,45 @@ const sections = [
 
 function FeaturesPage() {
   return (
-    <div className="mx-auto max-w-5xl px-6 py-16 md:py-24">
-      <div className="mb-16 text-center">
-        <h1 className="text-3xl font-bold tracking-tight md:text-5xl">
-          Features
-        </h1>
-        <p className="mt-3 text-lg text-muted-foreground">
-          Everything included — no plugins, no add-ons.
-        </p>
-      </div>
-
-      <div className="space-y-20">
-        {sections.map((section) => (
-          <div key={section.title}>
-            <h2 className="mb-8 text-2xl font-bold tracking-tight">
-              {section.title}
-            </h2>
-            <div className="grid gap-6 sm:grid-cols-2">
-              {section.features.map((f) => (
-                <div
-                  key={f.title}
-                  className="border border-border bg-card p-6"
-                >
-                  <div className="mb-3 flex h-10 w-10 items-center justify-center bg-accent text-primary">
-                    <HugeiconsIcon icon={f.icon} size={20} />
-                  </div>
-                  <h3 className="mb-2 font-semibold">{f.title}</h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    {f.description}
-                  </p>
-                </div>
-              ))}
-            </div>
+    <div className="mx-auto max-w-6xl border-x border-border">
+      <div className="relative">
+        <div className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-size-[4rem_4rem] opacity-35" />
+        <div className="px-6 py-16 md:py-24">
+          <div className="mb-16 text-center">
+            <h1 className="text-3xl font-bold tracking-tight md:text-5xl">
+              Features
+            </h1>
+            <p className="mt-3 text-lg text-muted-foreground">
+              Everything included — no plugins, no add-ons.
+            </p>
           </div>
-        ))}
+
+          <div className="space-y-20">
+            {sections.map((section) => (
+              <div key={section.title}>
+                <h2 className="mb-8 text-2xl font-bold tracking-tight">
+                  {section.title}
+                </h2>
+                <div className="grid gap-6 sm:grid-cols-2">
+                  {section.features.map((f) => (
+                    <div
+                      key={f.title}
+                      className="border border-border bg-background p-6"
+                    >
+                      <div className="mb-3 flex h-10 w-10 items-center justify-center border border-border text-foreground">
+                        <HugeiconsIcon icon={f.icon} size={20} />
+                      </div>
+                      <h3 className="mb-2 font-semibold">{f.title}</h3>
+                      <p className="text-sm leading-relaxed text-muted-foreground">
+                        {f.description}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )

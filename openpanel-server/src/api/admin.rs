@@ -653,7 +653,10 @@ pub async fn trigger_backup(
     )
     .await;
 
-    let file_size = tokio::fs::metadata(&backup_path).await.map(|m| m.len()).unwrap_or(0);
+    let file_size = tokio::fs::metadata(&backup_path)
+        .await
+        .map(|m| m.len())
+        .unwrap_or(0);
 
     Ok(Json(BackupResponse {
         filename,

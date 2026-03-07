@@ -24,6 +24,8 @@ import {
   register,
   logout as apiLogout,
   changePassword,
+  fetchPreferences,
+  updatePreferences,
 } from '@/lib/api'
 import { useAppStore } from '@/lib/store'
 
@@ -58,6 +60,41 @@ function AuthPage() {
   const [pwError, setPwError] = useState('')
   const [pwSuccess, setPwSuccess] = useState(false)
   const [pwSubmitting, setPwSubmitting] = useState(false)
+
+  // Section visibility (moved from home page)
+  interface SectionVisibility {
+    continueReading: boolean
+    recentlyAdded: boolean
+    recentlyUpdated: boolean
+  }
+  const defaultSections: SectionVisibility = {
+    continueReading: true,
+    recentlyAdded: true,
+    recentlyUpdated: true,
+  }
+  const [sections, setSections] = useState<SectionVisibility>(defaultSections)
+
+  // Load section prefs
+  useEffect(() => {
+    if (token && user) {
+      fetchPreferences()
+        .then((prefs) => {
+          if (prefs.homeSections && typeof prefs.homeSections === 'object') {
+            setSections({
+              ...defaultSections,
+              ...(prefs.homeSections as Partial<SectionVisibility>),
+            })
+          }
+        })
+        .catch(() => {})
+    }
+  }, [token, user])
+
+  const toggleSection = (key: keyof SectionVisibility) => {
+    const updated = { ...sections, [key]: !sections[key] }
+    setSections(updated)
+    updatePreferences({ homeSections: updated }).catch(() => {})
+  }
 
   const handleChangePassword = async () => {
     setPwError('')
@@ -167,7 +204,7 @@ function AuthPage() {
             <Link
               to="/admin"
               search={{ tab: 'libraries' }}
-              className="mb-2 flex w-full items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent md:hidden"
+              className="mb-2 flex w-full items-center gap-3 rounded-lg border border-border p-2.5 transition-colors hover:bg-accent md:hidden"
             >
               <HugeiconsIcon
                 icon={ShieldKeyIcon}
@@ -184,36 +221,28 @@ function AuthPage() {
           )}
 
           <h2 className="mb-3 text-lg font-semibold">Settings</h2>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {/* Theme toggle \u2013 mobile only (desktop has sidebar toggle) */}
             <button
               onClick={toggleTheme}
-              className="flex w-full items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent md:hidden"
+              className="flex w-full items-center gap-3 rounded-lg border border-border p-2.5 transition-colors hover:bg-accent md:hidden"
             >
               <HugeiconsIcon
                 icon={theme === 'dark' ? Sun01Icon : Moon02Icon}
-                size={20}
+                size={18}
                 className="text-muted-foreground"
               />
               <div className="text-left">
                 <p className="text-sm font-medium">
                   {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  Switch to {theme === 'dark' ? 'light' : 'dark'} theme
-                </p>
               </div>
             </button>
 
             {/* Chapter View Mode */}
-            <div className="rounded-lg border border-border p-3">
+            <div className="rounded-lg border border-border p-2.5">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Chapter View</p>
-                  <p className="text-xs text-muted-foreground">
-                    How chapters are displayed
-                  </p>
-                </div>
+                <p className="text-sm font-medium">Chapter View</p>
                 <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
                   <button
                     onClick={() => setChapterViewMode('list')}
@@ -240,14 +269,9 @@ function AuthPage() {
             </div>
 
             {/* Volume View Mode */}
-            <div className="rounded-lg border border-border p-3">
+            <div className="rounded-lg border border-border p-2.5">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Volume View</p>
-                  <p className="text-xs text-muted-foreground">
-                    How volumes are displayed
-                  </p>
-                </div>
+                <p className="text-sm font-medium">Volume View</p>
                 <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
                   <button
                     onClick={() => setVolumeViewMode('list')}
@@ -272,6 +296,32 @@ function AuthPage() {
                 </div>
               </div>
             </div>
+          </div>
+
+          <Separator className="my-4" />
+
+          {/* Home Sections */}
+          <h2 className="mb-3 text-lg font-semibold">Home Sections</h2>
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                ['continueReading', 'Continue Reading'],
+                ['recentlyAdded', 'Recently Added'],
+                ['recentlyUpdated', 'Recently Updated'],
+              ] as [keyof typeof sections, string][]
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => toggleSection(key)}
+                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                  sections[key]
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border text-muted-foreground hover:border-foreground'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
           <Separator className="my-4" />
@@ -356,6 +406,11 @@ function AuthPage() {
       >
         <Card>
           <CardHeader className="text-center">
+            <img
+              src={theme === 'dark' ? '/logo-dark.svg' : '/logo-light.svg'}
+              alt="OpenPanel"
+              className="mx-auto mb-2 h-10 w-auto"
+            />
             <CardTitle>
               {isSetupComplete ? 'Sign In' : 'Create Admin Account'}
             </CardTitle>

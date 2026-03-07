@@ -77,7 +77,7 @@ function MobileNavButton({
 
   const content = (
     <button
-      className={`flex flex-col items-center gap-0.5 transition-all duration-100 active:scale-90 ${
+      className={`flex select-none flex-col items-center gap-0.5 transition-all duration-100 active:scale-90 ${
         active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
       }`}
       onClick={handleClick}
@@ -106,6 +106,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const pathname = location.pathname
   const { isPWA } = usePWA()
+  const token = useAppStore((s) => s.token)
 
   // Determine active tab
   const isHome =
@@ -116,10 +117,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const isDownloads = pathname === '/downloads'
   const isProfile = pathname === '/profiles' || pathname === '/admin'
 
+  // Hide sidebar & bottom nav on sign-in page
+  const isSignIn = !token && pathname === '/profiles'
+
   return (
-    <div className="flex h-screen bg-background text-foreground">
-      {/* Desktop Sidebar  hidden on mobile */}
-      <aside className="hidden w-14 flex-col items-center justify-between border-r border-border bg-background py-4 md:flex">
+    <div className="flex h-dvh bg-background text-foreground">
+      {/* Desktop Sidebar  hidden on mobile & sign-in */}
+      <aside className={`${isSignIn ? 'hidden' : 'hidden md:flex'} w-14 flex-col items-center justify-between border-r border-border bg-background py-4`}>
         <div className="flex flex-col items-center gap-2">
           <SidebarButton icon={Book02Icon} label="Home" to="/" />
           <SidebarButton
@@ -168,8 +172,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      {/* Mobile Bottom Nav  hidden on desktop and while reading */}
-      {!readerActive && (
+      {/* Mobile Bottom Nav  hidden on desktop, while reading, and on sign-in */}
+      {!readerActive && !isSignIn && (
         <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-border bg-background pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] md:hidden">
           <MobileNavButton
             icon={Book02Icon}

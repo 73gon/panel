@@ -636,6 +636,7 @@ pub struct LogEntry {
 #[derive(Deserialize)]
 pub struct LogsQuery {
     pub level: Option<String>,
+    pub category: Option<String>,
     pub limit: Option<i64>,
 }
 
@@ -653,24 +654,45 @@ pub async fn get_logs(
 
     let limit = params.limit.unwrap_or(100).min(1000);
 
-    let rows: Vec<(i64, String, String, String, Option<String>, String)> = if let Some(level) =
-        &params.level
-    {
-        sqlx::query_as(
-            "SELECT id, level, category, message, details, created_at FROM admin_logs WHERE level = ? ORDER BY created_at DESC LIMIT ?",
-        )
-        .bind(level)
-        .bind(limit)
-        .fetch_all(&state.db)
-        .await?
-    } else {
-        sqlx::query_as(
-            "SELECT id, level, category, message, details, created_at FROM admin_logs ORDER BY created_at DESC LIMIT ?",
-        )
-        .bind(limit)
-        .fetch_all(&state.db)
-        .await?
-    };
+    let rows: Vec<(i64, String, String, String, Option<String>, String)> =
+        match (&params.level, &params.category) {
+            (Some(level), Some(category)) => {
+                sqlx::query_as(
+                    "SELECT id, level, category, message, details, created_at FROM admin_logs WHERE level = ? AND category = ? ORDER BY created_at DESC LIMIT ?",
+                )
+                .bind(level)
+                .bind(category)
+                .bind(limit)
+                .fetch_all(&state.db)
+                .await?
+            }
+            (Some(level), None) => {
+                sqlx::query_as(
+                    "SELECT id, level, category, message, details, created_at FROM admin_logs WHERE level = ? ORDER BY created_at DESC LIMIT ?",
+                )
+                .bind(level)
+                .bind(limit)
+                .fetch_all(&state.db)
+                .await?
+            }
+            (None, Some(category)) => {
+                sqlx::query_as(
+                    "SELECT id, level, category, message, details, created_at FROM admin_logs WHERE category = ? ORDER BY created_at DESC LIMIT ?",
+                )
+                .bind(category)
+                .bind(limit)
+                .fetch_all(&state.db)
+                .await?
+            }
+            (None, None) => {
+                sqlx::query_as(
+                    "SELECT id, level, category, message, details, created_at FROM admin_logs ORDER BY created_at DESC LIMIT ?",
+                )
+                .bind(limit)
+                .fetch_all(&state.db)
+                .await?
+            }
+        };
 
     let logs = rows
         .into_iter()

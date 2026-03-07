@@ -575,10 +575,12 @@ export interface AdminLog {
 
 export async function fetchAdminLogs(
   level?: string,
+  category?: string,
   limit = 50,
 ): Promise<AdminLog[]> {
   const params = new URLSearchParams()
   if (level) params.set('level', level)
+  if (category) params.set('category', category)
   params.set('limit', String(limit))
   const data = await request<{ logs: AdminLog[] }>(`/admin/logs?${params}`)
   return data.logs

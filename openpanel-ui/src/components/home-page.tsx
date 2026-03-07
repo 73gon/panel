@@ -8,7 +8,6 @@ import {
   ArrowRight,
   Add01Icon,
   Refresh,
-  Settings01Icon,
   FilterIcon,
   SortingIcon,
   ArrowUp01Icon,
@@ -107,8 +106,8 @@ function ContinueReadingCard({
     >
       <Link to="/read/$bookId" params={{ bookId: item.book_id }}>
         <Card className="group cursor-pointer overflow-hidden border border-border/50 transition-all hover:border-border hover:shadow-md">
-          <CardContent className="flex items-center gap-4 p-3">
-            <div className="relative h-16 w-11 shrink-0 overflow-hidden rounded bg-muted">
+          <CardContent className="flex items-center gap-3 py-1.5 px-3">
+            <div className="relative h-12 w-8 shrink-0 overflow-hidden rounded bg-muted">
               {item.cover_url ? (
                 <img
                   src={item.cover_url}
@@ -178,7 +177,6 @@ export function HomePage() {
   const [recentlyAdded, setRecentlyAdded] = useState<Series[]>([])
   const [recentlyUpdated, setRecentlyUpdated] = useState<Series[]>([])
   const [sections, setSections] = useState<SectionVisibility>(defaultSections)
-  const [showSectionSettings, setShowSectionSettings] = useState(false)
 
   // Filter & Sort state
   const [sortBy, setSortBy] = useState<
@@ -251,47 +249,6 @@ export function HomePage() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
-      {/* Section settings toggle */}
-      <div className="mb-6 flex items-center justify-end">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground"
-          onClick={() => setShowSectionSettings((p) => !p)}
-          title="Customize sections"
-        >
-          <HugeiconsIcon icon={Settings01Icon} size={16} />
-        </Button>
-      </div>
-
-      {/* Section settings panel */}
-      {showSectionSettings && (
-        <div className="mb-6 rounded-lg border border-border bg-card p-4">
-          <p className="mb-3 text-sm font-medium">Home Sections</p>
-          <div className="flex flex-wrap gap-3">
-            {(
-              [
-                ['continueReading', 'Continue Reading'],
-                ['recentlyAdded', 'Recently Added'],
-                ['recentlyUpdated', 'Recently Updated'],
-              ] as [keyof SectionVisibility, string][]
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => toggleSection(key)}
-                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                  sections[key]
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-border text-muted-foreground hover:border-foreground'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Continue Reading */}
       {sections.continueReading && displayedRecents.length > 0 && (
         <section className="mb-10">

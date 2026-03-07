@@ -311,7 +311,7 @@ function DocsPage() {
                 The fastest way to get running is Docker Compose. Clone the
                 repository and start:
               </p>
-              <Pre title="Terminal">{`git clone https://github.com/openreader/openpanel.git
+              <Pre title="Terminal">{`git clone https://github.com/73gon/openpanel.git
 cd openpanel`}</Pre>
               <p>
                 Open <Code>docker-compose.yml</Code> and update the volume mount
@@ -529,7 +529,7 @@ sudo systemctl enable --now openpanel`}</Pre>
                 </a>{' '}
                 for Windows, then clone and start:
               </p>
-              <Pre title="PowerShell">{`git clone https://github.com/openreader/openpanel.git
+              <Pre title="PowerShell">{`git clone https://github.com/73gon/openpanel.git
 cd openpanel`}</Pre>
               <p>
                 Edit <Code>docker-compose.yml</Code> and use Windows-style paths

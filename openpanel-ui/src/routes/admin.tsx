@@ -150,6 +150,7 @@ function AdminDashboard() {
   // Logs
   const [logs, setLogs] = useState<AdminLog[]>([])
   const [logLevel, setLogLevel] = useState<string>('')
+  const [logCategory, setLogCategory] = useState<string>('')
   const [logsLoading, setLogsLoading] = useState(false)
 
   // Backups
@@ -478,7 +479,7 @@ function AdminDashboard() {
   const loadLogs = async () => {
     setLogsLoading(true)
     try {
-      const data = await fetchAdminLogs(logLevel || undefined)
+      const data = await fetchAdminLogs(logLevel || undefined, logCategory || undefined)
       setLogs(data)
     } catch {
     } finally {
@@ -491,7 +492,7 @@ function AdminDashboard() {
     if (tab === 'logs' && logs.length === 0) {
       loadLogs()
     }
-  }, [tab])
+  }, [tab, logLevel, logCategory])
 
   const handleBackup = async () => {
     setBackingUp(true)
@@ -530,12 +531,12 @@ function AdminDashboard() {
             navigate({ to: '/admin', search: { tab: v }, replace: true })
           }
         >
-          <TabsList className="mb-6 w-full">
-            <TabsTrigger value="libraries" className="flex-1">
+          <TabsList className="mb-6 w-full overflow-x-auto">
+            <TabsTrigger value="libraries" className="select-none whitespace-nowrap">
               <HugeiconsIcon icon={Library} size={14} className="mr-1.5" />
               Libraries
             </TabsTrigger>
-            <TabsTrigger value="profiles" className="flex-1">
+            <TabsTrigger value="profiles" className="select-none whitespace-nowrap">
               <HugeiconsIcon
                 icon={UserCircleIcon}
                 size={14}
@@ -543,7 +544,7 @@ function AdminDashboard() {
               />
               Profiles
             </TabsTrigger>
-            <TabsTrigger value="settings" className="flex-1">
+            <TabsTrigger value="settings" className="select-none whitespace-nowrap">
               <HugeiconsIcon
                 icon={Settings01Icon}
                 size={14}
@@ -551,7 +552,7 @@ function AdminDashboard() {
               />
               Settings
             </TabsTrigger>
-            <TabsTrigger value="logs" className="flex-1">
+            <TabsTrigger value="logs" className="select-none whitespace-nowrap">
               <HugeiconsIcon icon={Audit01Icon} size={14} className="mr-1.5" />
               Logs
             </TabsTrigger>
@@ -1052,8 +1053,8 @@ function AdminDashboard() {
 
                 <Card>
                   <CardContent className="space-y-4 py-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
+                    <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+                      <div className="w-full space-y-1 sm:w-auto">
                         <div className="flex items-center gap-2">
                           <p className="font-medium">Update OpenPanel</p>
                           {updateCheck?.update_available &&
@@ -1095,7 +1096,7 @@ function AdminDashboard() {
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex w-full items-center gap-2 sm:w-auto">
                         {updatePhase === 'idle' && !updating && (
                           <Button
                             onClick={handleCheckUpdate}
@@ -1123,7 +1124,7 @@ function AdminDashboard() {
                               ? 'default'
                               : 'outline'
                           }
-                          className="gap-2"
+                          className="flex-1 gap-2 sm:flex-none"
                         >
                           {updating ? (
                             <HugeiconsIcon
@@ -1261,6 +1262,17 @@ function AdminDashboard() {
                       <option value="info">Info</option>
                       <option value="warn">Warning</option>
                       <option value="error">Error</option>
+                    </select>
+                    <select
+                      value={logCategory}
+                      onChange={(e) => setLogCategory(e.target.value)}
+                      className="rounded border border-border bg-background px-2 py-1 text-sm"
+                    >
+                      <option value="">All categories</option>
+                      <option value="auth">Auth</option>
+                      <option value="download">Downloads</option>
+                      <option value="admin">Admin</option>
+                      <option value="scanner">Scanner</option>
                     </select>
                     <Button
                       size="sm"

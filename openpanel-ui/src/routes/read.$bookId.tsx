@@ -39,6 +39,7 @@ import {
   type BookChapter,
 } from '@/lib/api'
 import { useAppStore } from '@/lib/store'
+import { isBookDownloaded, getDownloadedPageUrl } from '@/lib/downloads'
 
 export const Route = createFileRoute('/read/$bookId')({
   component: ReaderPage,
@@ -78,6 +79,21 @@ function ReaderPage() {
   const [chapters, setChapters] = useState<BookChapter[]>([])
   const [showToc, setShowToc] = useState(false)
 
+  // Offline page URLs (IDB blob URLs for downloaded books)
+  const [offlineUrls, setOfflineUrls] = useState<Map<string, string>>(
+    new Map(),
+  )
+  const isOfflineBook = useRef(false)
+
+  // Resolve page URL: IDB blob first, then server
+  const resolvePageUrl = useCallback(
+    (bid: string, page: number) => {
+      const key = `${bid}-${page}`
+      return offlineUrls.get(key) || getPageUrl(bid, page)
+    },
+    [offlineUrls],
+  )
+
   const scrollRef = useRef<HTMLDivElement>(null)
   const progressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -86,6 +102,33 @@ function ReaderPage() {
   useEffect(() => {
     scrollRef.current?.scrollTo(0, 0)
     window.scrollTo(0, 0)
+  }, [bookId])
+
+  // Check if book is downloaded and preload IDB blob URLs
+  useEffect(() => {
+    let cancelled = false
+    async function loadOfflinePages() {
+      const downloaded = await isBookDownloaded(bookId)
+      if (!downloaded || cancelled) {
+        isOfflineBook.current = false
+        return
+      }
+      isOfflineBook.current = true
+      // We'll load pages lazily as needed rather than all at once
+      // But preload first few pages for instant display
+      const urls = new Map<string, string>()
+      // Load pages 1-10 upfront for instant rendering
+      const preloadCount = 10
+      for (let p = 1; p <= preloadCount; p++) {
+        const url = await getDownloadedPageUrl(bookId, p)
+        if (url && !cancelled) urls.set(`${bookId}-${p}`, url)
+      }
+      if (!cancelled) setOfflineUrls(new Map(urls))
+    }
+    loadOfflinePages()
+    return () => {
+      cancelled = true
+    }
   }, [bookId])
 
   // Mark reader as active (hides mobile nav)
@@ -221,7 +264,7 @@ function ReaderPage() {
     return () => observer.disconnect()
   }, [readMode, book, loadedPages.size, saveProgress])
 
-  // Preload adjacent pages
+  // Preload adjacent pages (and lazily resolve IDB URLs)
   useEffect(() => {
     if (!book) return
     const toPreload = [
@@ -233,15 +276,35 @@ function ReaderPage() {
       currentPage - 1,
       currentPage - 2,
     ].filter((p) => p >= 1 && p <= book.page_count)
-    for (const p of toPreload) {
-      const img = new Image()
-      img.src = getPageUrl(bookId, p)
-    }
-  }, [readMode, currentPage, book, bookId])
 
-  // Prefetch adjacent chapters
+    // For offline books, lazily resolve IDB blob URLs
+    if (isOfflineBook.current) {
+      ;(async () => {
+        const newUrls = new Map(offlineUrls)
+        let changed = false
+        for (const p of toPreload) {
+          const key = `${bookId}-${p}`
+          if (!newUrls.has(key)) {
+            const url = await getDownloadedPageUrl(bookId, p)
+            if (url) {
+              newUrls.set(key, url)
+              changed = true
+            }
+          }
+        }
+        if (changed) setOfflineUrls(newUrls)
+      })()
+    } else {
+      for (const p of toPreload) {
+        const img = new Image()
+        img.src = resolvePageUrl(bookId, p)
+      }
+    }
+  }, [readMode, currentPage, book, bookId, resolvePageUrl, offlineUrls])
+
+  // Prefetch adjacent chapters (only when online)
   useEffect(() => {
-    if (siblings.length === 0) return
+    if (siblings.length === 0 || isOfflineBook.current) return
     const idx = siblings.findIndex((b) => b.id === bookId)
     const adjacentIds: string[] = []
     if (idx > 0) adjacentIds.push(siblings[idx - 1].id)
@@ -250,10 +313,10 @@ function ReaderPage() {
       fetchBookDetail(adjId).catch(() => {})
       for (let p = 1; p <= 3; p++) {
         const img = new Image()
-        img.src = getPageUrl(adjId, p)
+        img.src = resolvePageUrl(adjId, p)
       }
     }
-  }, [siblings, bookId])
+  }, [siblings, bookId, resolvePageUrl])
 
   // Keyboard navigation
   useEffect(() => {
@@ -706,7 +769,7 @@ function ReaderPage() {
                   }
                 >
                   <img
-                    src={getPageUrl(bookId, page)}
+                    src={resolvePageUrl(bookId, page)}
                     alt={`Page ${page}`}
                     className={`${getFitClass()} block ${
                       loadedPages.has(page)
@@ -786,7 +849,7 @@ function ReaderPage() {
           {/* Left page (or only page if wide) */}
           <img
             key={`left-${currentPage}`}
-            src={getPageUrl(bookId, currentPage)}
+            src={resolvePageUrl(bookId, currentPage)}
             alt={`Page ${currentPage}`}
             className="object-contain max-h-[calc(100vh-6rem)] max-w-[49%]"
             onLoad={(e) => {
@@ -801,7 +864,7 @@ function ReaderPage() {
             currentPage + 1 <= book.page_count && (
               <img
                 key={`right-${currentPage + 1}`}
-                src={getPageUrl(bookId, currentPage + 1)}
+                src={resolvePageUrl(bookId, currentPage + 1)}
                 alt={`Page ${currentPage + 1}`}
                 className="object-contain max-h-[calc(100vh-6rem)] max-w-[49%]"
                 onLoad={(e) => {
@@ -851,7 +914,7 @@ function ReaderPage() {
         >
           <img
             key={currentPage}
-            src={getPageUrl(bookId, currentPage)}
+            src={resolvePageUrl(bookId, currentPage)}
             alt={`Page ${currentPage}`}
             className={`object-contain ${
               fitMode === 'width'

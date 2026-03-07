@@ -1,14 +1,18 @@
 /**
  * Offline download system using IndexedDB for storing manga pages as blobs.
  * Uses navigator.storage.persist() for eviction protection.
+ *
+ * The download-store.ts handles queue management and drives downloads.
+ * This module provides the IDB primitives and query functions.
  */
 
 import { useAppStore } from './store'
 
 const DB_NAME = 'openpanel-downloads'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const PAGES_STORE = 'pages'
 const META_STORE = 'metadata'
+const COVERS_STORE = 'covers'
 
 // ── Types ──
 
@@ -30,9 +34,18 @@ export interface DownloadProgress {
   status: 'downloading' | 'complete' | 'error'
 }
 
+export interface SeriesDownloadGroup {
+  seriesId: string
+  seriesName: string
+  books: DownloadMeta[]
+  totalSize: number
+  totalBooks: number
+  completedBooks: number
+}
+
 // ── Database ──
 
-function openDB(): Promise<IDBDatabase> {
+export function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
 
@@ -43,6 +56,9 @@ function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(META_STORE)) {
         db.createObjectStore(META_STORE, { keyPath: 'bookId' })
+      }
+      if (!db.objectStoreNames.contains(COVERS_STORE)) {
+        db.createObjectStore(COVERS_STORE)
       }
     }
 
@@ -154,6 +170,60 @@ export async function downloadBook(
   report('complete')
 }
 
+// ── Cover downloads ──
+
+export async function downloadCover(
+  db: IDBDatabase,
+  url: string,
+  token: string | null,
+): Promise<void> {
+  // Check if already cached
+  const existing = await new Promise<Blob | undefined>((resolve, reject) => {
+    const tx = db.transaction(COVERS_STORE, 'readonly')
+    const req = tx.objectStore(COVERS_STORE).get(url)
+    req.onsuccess = () => resolve(req.result as Blob | undefined)
+    req.onerror = () => reject(req.error)
+  })
+  if (existing) return
+
+  const headers: Record<string, string> = {}
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
+  const res = await fetch(url, { headers })
+  if (!res.ok) return
+
+  const blob = await res.blob()
+
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(COVERS_STORE, 'readwrite')
+    tx.objectStore(COVERS_STORE).put(blob, url)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+export async function getDownloadedCover(url: string): Promise<string | null> {
+  try {
+    const db = await openDB()
+    const tx = db.transaction(COVERS_STORE, 'readonly')
+    const req = tx.objectStore(COVERS_STORE).get(url)
+
+    return new Promise((resolve) => {
+      req.onsuccess = () => {
+        db.close()
+        const blob = req.result as Blob | undefined
+        resolve(blob ? URL.createObjectURL(blob) : null)
+      }
+      req.onerror = () => {
+        db.close()
+        resolve(null)
+      }
+    })
+  } catch {
+    return null
+  }
+}
+
 // ── Delete a download ──
 
 export async function deleteDownload(bookId: string): Promise<void> {
@@ -213,6 +283,14 @@ export async function deleteAllDownloads(): Promise<void> {
     tx2.onerror = () => reject(tx2.error)
   })
 
+  // Also clear covers
+  const tx3 = db.transaction(COVERS_STORE, 'readwrite')
+  tx3.objectStore(COVERS_STORE).clear()
+  await new Promise<void>((resolve, reject) => {
+    tx3.oncomplete = () => resolve()
+    tx3.onerror = () => reject(tx3.error)
+  })
+
   db.close()
 }
 
@@ -234,6 +312,34 @@ export async function getDownloads(): Promise<DownloadMeta[]> {
       reject(req.error)
     }
   })
+}
+
+export async function getDownloadsBySeries(): Promise<SeriesDownloadGroup[]> {
+  const downloads = await getDownloads()
+  const groups = new Map<string, SeriesDownloadGroup>()
+
+  for (const dl of downloads) {
+    let group = groups.get(dl.seriesId)
+    if (!group) {
+      group = {
+        seriesId: dl.seriesId,
+        seriesName: dl.seriesName,
+        books: [],
+        totalSize: 0,
+        totalBooks: 0,
+        completedBooks: 0,
+      }
+      groups.set(dl.seriesId, group)
+    }
+    group.books.push(dl)
+    group.totalSize += dl.totalSize
+    group.totalBooks += 1
+    if (dl.downloadedPages === dl.pageCount) {
+      group.completedBooks += 1
+    }
+  }
+
+  return Array.from(groups.values())
 }
 
 export async function isBookDownloaded(bookId: string): Promise<boolean> {
@@ -281,6 +387,17 @@ export async function getDownloadedPage(
   })
 }
 
+/**
+ * Check if a page is available offline and return a blob URL if so.
+ * Returns null if not available — caller should fall back to server URL.
+ */
+export async function getDownloadedPageUrl(
+  bookId: string,
+  page: number,
+): Promise<string | null> {
+  return getDownloadedPage(bookId, page)
+}
+
 export async function getStorageEstimate(): Promise<{
   usage: number
   quota: number
@@ -294,7 +411,7 @@ export async function getStorageEstimate(): Promise<{
 
 // ── Helpers ──
 
-function saveMetadata(db: IDBDatabase, meta: DownloadMeta): Promise<void> {
+export function saveMetadata(db: IDBDatabase, meta: DownloadMeta): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(META_STORE, 'readwrite')
     const store = tx.objectStore(META_STORE)
@@ -302,6 +419,15 @@ function saveMetadata(db: IDBDatabase, meta: DownloadMeta): Promise<void> {
     tx.oncomplete = () => resolve()
     tx.onerror = () => reject(tx.error)
   })
+}
+
+/** Delete all downloads for a specific series */
+export async function deleteSeriesDownloads(seriesId: string): Promise<void> {
+  const downloads = await getDownloads()
+  const seriesBooks = downloads.filter((d) => d.seriesId === seriesId)
+  for (const book of seriesBooks) {
+    await deleteDownload(book.bookId)
+  }
 }
 
 /** Format bytes to human-readable string */

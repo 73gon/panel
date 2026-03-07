@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Link, createFileRoute } from '@tanstack/react-router'
-import { motion, AnimatePresence } from 'motion/react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { createFileRoute } from '@tanstack/react-router'
+import { motion, AnimatePresence, useMotionValue, useTransform, type PanInfo } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Download04Icon,
@@ -8,27 +8,340 @@ import {
   Book02Icon,
   HardDrive,
   Alert02Icon,
+  ArrowLeft02Icon,
+  Cancel01Icon,
 } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import {
-  type DownloadMeta,
-  getDownloads,
+  type SeriesDownloadGroup,
+  getDownloadsBySeries,
   deleteDownload,
   deleteAllDownloads,
+  deleteSeriesDownloads,
   getStorageEstimate,
   formatBytes,
 } from '@/lib/downloads'
+import { useDownloadStore, type DownloadStatus } from '@/lib/download-store'
+import { CircularProgress } from '@/components/ui/circular-progress'
+
+// ── Swipe-to-delete item ──
+
+function SwipeableItem({
+  children,
+  onDelete,
+  itemKey,
+}: {
+  children: React.ReactNode
+  onDelete: () => void
+  itemKey: string
+}) {
+  const x = useMotionValue(0)
+  const bgOpacity = useTransform(x, [-120, -60, 0], [1, 0.8, 0])
+  const deleteScale = useTransform(x, [-120, -60, 0], [1, 0.8, 0.5])
+  const isTouchDevice =
+    typeof window !== 'undefined' && 'ontouchstart' in window
+
+  const handleDragEnd = (_: unknown, info: PanInfo) => {
+    if (info.offset.x < -100) {
+      onDelete()
+    }
+  }
+
+  if (!isTouchDevice) return <>{children}</>
+
+  return (
+    <div className="relative overflow-hidden rounded-lg">
+      {/* Delete background */}
+      <motion.div
+        className="absolute inset-0 flex items-center justify-end rounded-lg bg-destructive px-4"
+        style={{ opacity: bgOpacity }}
+      >
+        <motion.div style={{ scale: deleteScale }}>
+          <HugeiconsIcon icon={Delete02Icon} size={20} className="text-white" />
+        </motion.div>
+      </motion.div>
+      {/* Draggable content */}
+      <motion.div
+        drag="x"
+        dragConstraints={{ left: 0, right: 0 }}
+        dragElastic={{ left: 0.3, right: 0 }}
+        dragDirectionLock
+        onDragEnd={handleDragEnd}
+        style={{ x }}
+        className="relative"
+        key={itemKey}
+      >
+        {children}
+      </motion.div>
+    </div>
+  )
+}
+
+// ── Queue item with circular progress ──
+
+function QueueBookItem({
+  status,
+  title,
+  onPause,
+  onResume,
+  onCancel,
+}: {
+  status: DownloadStatus
+  title: string
+  onPause: () => void
+  onResume: () => void
+  onCancel: () => void
+}) {
+  const progress =
+    status.totalPages > 0 ? status.downloadedPages / status.totalPages : 0
+
+  return (
+    <div className="flex items-center gap-3 py-1.5">
+      <CircularProgress
+        progress={progress}
+        status={status.status}
+        size={28}
+        strokeWidth={3}
+        onClick={() => {
+          if (status.status === 'downloading') onPause()
+          else if (status.status === 'paused') onResume()
+        }}
+      />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm">{title}</p>
+        <p className="text-[10px] text-muted-foreground">
+          {status.status === 'complete'
+            ? formatBytes(status.totalSize)
+            : status.status === 'error'
+              ? 'Error'
+              : status.status === 'paused'
+                ? `Paused · ${status.downloadedPages}/${status.totalPages}`
+                : status.status === 'queued'
+                  ? 'Queued'
+                  : `${status.downloadedPages}/${status.totalPages} pages`}
+        </p>
+      </div>
+      {status.status !== 'complete' && (
+        <button
+          onClick={onCancel}
+          className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive"
+        >
+          <HugeiconsIcon icon={Cancel01Icon} size={14} />
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ── Series group card (collapsed) ──
+
+function SeriesGroupCard({
+  group,
+  queueStatuses,
+  onSelect,
+  onDelete,
+}: {
+  group: SeriesDownloadGroup
+  queueStatuses: Record<string, DownloadStatus>
+  onSelect: () => void
+  onDelete: () => void
+}) {
+  // Count active/queued items for this series
+  const activeCount = group.books.filter(
+    (b) =>
+      queueStatuses[b.bookId] &&
+      ['queued', 'downloading', 'paused'].includes(
+        queueStatuses[b.bookId].status,
+      ),
+  ).length
+
+  return (
+    <SwipeableItem onDelete={onDelete} itemKey={group.seriesId}>
+      <button
+        onClick={onSelect}
+        className="flex w-full items-center gap-3 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:bg-accent"
+      >
+        <div className="flex h-12 w-9 shrink-0 items-center justify-center rounded bg-muted">
+          <HugeiconsIcon
+            icon={Book02Icon}
+            size={16}
+            className="text-muted-foreground/40"
+          />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{group.seriesName}</p>
+          <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+            <span>
+              {group.completedBooks}/{group.totalBooks} books
+            </span>
+            <span>·</span>
+            <span>{formatBytes(group.totalSize)}</span>
+            {activeCount > 0 && (
+              <>
+                <span>·</span>
+                <span className="text-primary">{activeCount} in queue</span>
+              </>
+            )}
+          </div>
+        </div>
+        <HugeiconsIcon
+          icon={ArrowLeft02Icon}
+          size={16}
+          className="shrink-0 rotate-180 text-muted-foreground"
+        />
+      </button>
+    </SwipeableItem>
+  )
+}
+
+// ── Series detail view (expanded) ──
+
+function SeriesDetail({
+  group,
+  queueStatuses,
+  onBack,
+  onDeleteBook,
+}: {
+  group: SeriesDownloadGroup
+  queueStatuses: Record<string, DownloadStatus>
+  onBack: () => void
+  onDeleteBook: (bookId: string) => void
+}) {
+  const { pauseDownload, resumeDownload, cancelDownload } = useDownloadStore()
+
+  // Merge downloaded books with queue items
+  const allBooks = [...group.books]
+  // Add queued items not yet in metadata
+  const queue = useDownloadStore((s) => s.queue)
+  for (const qi of queue) {
+    if (qi.seriesId === group.seriesId && !allBooks.find((b) => b.bookId === qi.bookId)) {
+      allBooks.push({
+        bookId: qi.bookId,
+        title: qi.title,
+        seriesId: qi.seriesId,
+        seriesName: qi.seriesName,
+        pageCount: qi.pageCount,
+        downloadedPages: 0,
+        totalSize: 0,
+        downloadedAt: '',
+      })
+    }
+  }
+
+  return (
+    <div>
+      <button
+        onClick={onBack}
+        className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <HugeiconsIcon icon={ArrowLeft02Icon} size={16} />
+        Back
+      </button>
+      <h2 className="mb-3 text-lg font-semibold">{group.seriesName}</h2>
+      <div className="space-y-1">
+        <AnimatePresence mode="popLayout">
+          {allBooks.map((book) => {
+            const qs = queueStatuses[book.bookId]
+            const isInQueue = !!qs && qs.status !== 'complete'
+            const isComplete =
+              book.downloadedPages === book.pageCount &&
+              book.pageCount > 0 &&
+              (!qs || qs.status === 'complete')
+
+            if (isInQueue) {
+              return (
+                <motion.div
+                  key={book.bookId}
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0, x: -80 }}
+                >
+                  <QueueBookItem
+                    status={qs}
+                    title={book.title}
+                    onPause={() => pauseDownload(book.bookId)}
+                    onResume={() => resumeDownload(book.bookId)}
+                    onCancel={() => cancelDownload(book.bookId)}
+                  />
+                </motion.div>
+              )
+            }
+
+            const progress =
+              book.pageCount > 0
+                ? book.downloadedPages / book.pageCount
+                : 0
+
+            return (
+              <motion.div
+                key={book.bookId}
+                layout
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, x: -80 }}
+              >
+                <SwipeableItem
+                  onDelete={() => onDeleteBook(book.bookId)}
+                  itemKey={book.bookId}
+                >
+                  <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-2.5">
+                    <CircularProgress
+                      progress={progress}
+                      status={isComplete ? 'complete' : 'error'}
+                      size={28}
+                      strokeWidth={3}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm">{book.title}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {formatBytes(book.totalSize)}
+                        {!isComplete && book.pageCount > 0 && (
+                          <span className="text-amber-500">
+                            {' '}
+                            · Incomplete ({book.downloadedPages}/
+                            {book.pageCount})
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => onDeleteBook(book.bookId)}
+                      className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive"
+                    >
+                      <HugeiconsIcon icon={Delete02Icon} size={14} />
+                    </button>
+                  </div>
+                </SwipeableItem>
+              </motion.div>
+            )
+          })}
+        </AnimatePresence>
+      </div>
+    </div>
+  )
+}
+
+// ── Main Downloads Page ──
 
 function DownloadsPage() {
-  const [downloads, setDownloads] = useState<DownloadMeta[]>([])
+  const [groups, setGroups] = useState<SeriesDownloadGroup[]>([])
   const [storage, setStorage] = useState({ usage: 0, quota: 0 })
   const [loading, setLoading] = useState(true)
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [selectedSeries, setSelectedSeries] = useState<string | null>(null)
+
+  const queue = useDownloadStore((s) => s.queue)
+  const statuses = useDownloadStore((s) => s.statuses)
+  const { pauseDownload, resumeDownload, cancelDownload, clearQueue } =
+    useDownloadStore()
 
   const refresh = useCallback(async () => {
-    const [dl, est] = await Promise.all([getDownloads(), getStorageEstimate()])
-    setDownloads(dl)
+    const [grps, est] = await Promise.all([
+      getDownloadsBySeries(),
+      getStorageEstimate(),
+    ])
+    setGroups(grps)
     setStorage(est)
     setLoading(false)
   }, [])
@@ -37,23 +350,64 @@ function DownloadsPage() {
     refresh()
   }, [refresh])
 
-  const handleDelete = async (bookId: string) => {
-    setDeletingId(bookId)
-    try {
-      await deleteDownload(bookId)
-      await refresh()
-    } finally {
-      setDeletingId(null)
+  // Re-refresh when statuses update (download completes)
+  const statusesRef = useRef(statuses)
+  useEffect(() => {
+    const prev = statusesRef.current
+    statusesRef.current = statuses
+    // If any status changed to complete, refresh
+    for (const [id, s] of Object.entries(statuses)) {
+      if (s.status === 'complete' && prev[id]?.status !== 'complete') {
+        refresh()
+        break
+      }
     }
-  }
+  }, [statuses, refresh])
 
   const handleDeleteAll = async () => {
+    clearQueue()
     await deleteAllDownloads()
     setConfirmDeleteAll(false)
+    setSelectedSeries(null)
     await refresh()
   }
 
-  const totalDownloadSize = downloads.reduce((s, d) => s + d.totalSize, 0)
+  const handleDeleteBook = async (bookId: string) => {
+    cancelDownload(bookId)
+    await deleteDownload(bookId)
+    await refresh()
+  }
+
+  const handleDeleteSeries = async (seriesId: string) => {
+    // Cancel any queued items
+    queue
+      .filter((q) => q.seriesId === seriesId)
+      .forEach((q) => cancelDownload(q.bookId))
+    await deleteSeriesDownloads(seriesId)
+    if (selectedSeries === seriesId) setSelectedSeries(null)
+    await refresh()
+  }
+
+  const totalBooks = groups.reduce((s, g) => s + g.totalBooks, 0)
+  const selectedGroup = groups.find((g) => g.seriesId === selectedSeries)
+
+  // Build combined groups including queued-only series
+  const allGroups = [...groups]
+  for (const qi of queue) {
+    if (!allGroups.find((g) => g.seriesId === qi.seriesId)) {
+      const existing = allGroups.find((g) => g.seriesId === qi.seriesId)
+      if (!existing) {
+        allGroups.push({
+          seriesId: qi.seriesId,
+          seriesName: qi.seriesName,
+          books: [],
+          totalSize: 0,
+          totalBooks: 0,
+          completedBooks: 0,
+        })
+      }
+    }
+  }
 
   if (loading) {
     return (
@@ -87,7 +441,7 @@ function DownloadsPage() {
           />
           <h1 className="text-xl font-semibold">Downloads</h1>
         </div>
-        {downloads.length > 0 && (
+        {(totalBooks > 0 || queue.length > 0) && (
           <Button
             variant="ghost"
             size="sm"
@@ -99,41 +453,66 @@ function DownloadsPage() {
         )}
       </div>
 
-      {/* Storage info */}
+      {/* Storage info — only show used */}
       <div className="mb-6 flex items-center gap-3 rounded-lg border border-border bg-card p-3">
         <HugeiconsIcon
           icon={HardDrive}
           size={18}
           className="text-muted-foreground"
         />
-        <div className="flex-1">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Storage used</span>
-            <span className="font-medium">
-              {formatBytes(totalDownloadSize)}
-              {storage.quota > 0 && (
-                <span className="text-muted-foreground">
-                  {' '}
-                  / {formatBytes(storage.quota)}
-                </span>
-              )}
-            </span>
-          </div>
-          {storage.quota > 0 && (
-            <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary transition-all"
-                style={{
-                  width: `${Math.min((storage.usage / storage.quota) * 100, 100)}%`,
-                }}
-              />
-            </div>
-          )}
-        </div>
+        <p className="text-sm">
+          <span className="font-medium">{formatBytes(storage.usage)}</span>
+          <span className="text-muted-foreground"> used</span>
+        </p>
       </div>
 
-      {/* Downloads list */}
-      {downloads.length === 0 ? (
+      {/* Active queue summary */}
+      {queue.length > 0 && !selectedSeries && (
+        <div className="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-sm font-medium">
+              Download Queue ({queue.length})
+            </p>
+            <button
+              onClick={() => clearQueue()}
+              className="text-xs text-muted-foreground hover:text-destructive"
+            >
+              Cancel all
+            </button>
+          </div>
+          <div className="space-y-1">
+            {queue.slice(0, 5).map((qi) => {
+              const qs = statuses[qi.bookId]
+              if (!qs) return null
+              return (
+                <QueueBookItem
+                  key={qi.bookId}
+                  status={qs}
+                  title={`${qi.seriesName} · ${qi.title}`}
+                  onPause={() => pauseDownload(qi.bookId)}
+                  onResume={() => resumeDownload(qi.bookId)}
+                  onCancel={() => cancelDownload(qi.bookId)}
+                />
+              )
+            })}
+            {queue.length > 5 && (
+              <p className="text-[10px] text-muted-foreground">
+                +{queue.length - 5} more in queue
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Content */}
+      {selectedGroup ? (
+        <SeriesDetail
+          group={selectedGroup}
+          queueStatuses={statuses}
+          onBack={() => setSelectedSeries(null)}
+          onDeleteBook={handleDeleteBook}
+        />
+      ) : allGroups.length === 0 && queue.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <HugeiconsIcon
             icon={Download04Icon}
@@ -148,58 +527,21 @@ function DownloadsPage() {
       ) : (
         <div className="space-y-2">
           <AnimatePresence mode="popLayout">
-            {downloads.map((dl) => (
+            {allGroups.map((group) => (
               <motion.div
-                key={dl.bookId}
+                key={group.seriesId}
                 layout
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, x: -100 }}
                 transition={{ duration: 0.2 }}
               >
-                <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-3">
-                  <Link
-                    to="/series/$seriesId"
-                    params={{ seriesId: dl.seriesId }}
-                    className="flex min-w-0 flex-1 items-center gap-3"
-                  >
-                    <div className="flex h-12 w-9 shrink-0 items-center justify-center rounded bg-muted">
-                      <HugeiconsIcon
-                        icon={Book02Icon}
-                        size={16}
-                        className="text-muted-foreground/40"
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{dl.title}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {dl.seriesName}
-                      </p>
-                      <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted-foreground/60">
-                        <span>{dl.pageCount} pages</span>
-                        <span>·</span>
-                        <span>{formatBytes(dl.totalSize)}</span>
-                        {dl.downloadedPages < dl.pageCount && (
-                          <>
-                            <span>·</span>
-                            <span className="text-amber-500">
-                              Incomplete ({dl.downloadedPages}/{dl.pageCount})
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => handleDelete(dl.bookId)}
-                    disabled={deletingId === dl.bookId}
-                  >
-                    <HugeiconsIcon icon={Delete02Icon} size={16} />
-                  </Button>
-                </div>
+                <SeriesGroupCard
+                  group={group}
+                  queueStatuses={statuses}
+                  onSelect={() => setSelectedSeries(group.seriesId)}
+                  onDelete={() => handleDeleteSeries(group.seriesId)}
+                />
               </motion.div>
             ))}
           </AnimatePresence>
@@ -232,8 +574,8 @@ function DownloadsPage() {
                 <h3 className="font-semibold">Delete all downloads?</h3>
               </div>
               <p className="mb-6 text-sm text-muted-foreground">
-                This will remove all {downloads.length} downloaded items (
-                {formatBytes(totalDownloadSize)}). This cannot be undone.
+                This will remove all downloaded items and cancel queued
+                downloads. This cannot be undone.
               </p>
               <div className="flex justify-end gap-2">
                 <Button

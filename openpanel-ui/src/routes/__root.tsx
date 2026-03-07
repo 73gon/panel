@@ -19,7 +19,41 @@ function RouteLoadingBar() {
   )
 }
 
+/** Detect if an error is a network/fetch failure (server unreachable). */
+function isNetworkError(error: unknown): boolean {
+  if (error instanceof TypeError && error.message === 'Failed to fetch')
+    return true
+  if (
+    error instanceof Error &&
+    (error.message.includes('NetworkError') ||
+      error.message.includes('net::ERR_') ||
+      error.message.includes('fetch'))
+  )
+    return true
+  return !navigator.onLine
+}
+
 function RootErrorComponent({ error, reset }: ErrorComponentProps) {
+  const token = useAppStore((s) => s.token)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (isNetworkError(error) && token) {
+      navigate({ to: '/downloads', replace: true })
+    }
+  }, [error, token, navigate])
+
+  if (isNetworkError(error) && token) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
+        <h2 className="mb-2 text-xl font-semibold">You're offline</h2>
+        <p className="mb-4 max-w-md text-sm text-muted-foreground">
+          Redirecting to your downloads…
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
       <h2 className="mb-2 text-xl font-semibold">Something went wrong</h2>

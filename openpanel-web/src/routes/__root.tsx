@@ -301,7 +301,7 @@ function RootComponent() {
               )
             })}
             <a
-              href="https://github.com/openreader/openpanel"
+              href="https://github.com/73gon/openpanel"
               target="_blank"
               rel="noopener noreferrer"
               className="relative z-10 ml-2 px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -344,7 +344,7 @@ function RootComponent() {
               </Link>
             ))}
             <a
-              href="https://github.com/openreader/openpanel"
+              href="https://github.com/73gon/openpanel"
               target="_blank"
               rel="noopener noreferrer"
               className="block px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
@@ -364,7 +364,7 @@ function RootComponent() {
           <p>&copy; {new Date().getFullYear()} OpenPanel. MIT License.</p>
           <div className="flex gap-6">
             <a
-              href="https://github.com/openreader/openpanel"
+              href="https://github.com/73gon/openpanel"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-foreground transition-colors"

@@ -52,10 +52,10 @@ import { formatStatus, getDisplayTitle, getRomajiSubtitle } from '@/lib/anilist'
 import { useAppStore } from '@/lib/store'
 import { usePWA } from '@/lib/use-pwa'
 import {
-  downloadBook,
   isBookDownloaded,
-  type DownloadProgress,
 } from '@/lib/downloads'
+import { useDownloadStore, type QueueItem } from '@/lib/download-store'
+import { CircularProgress } from '@/components/ui/circular-progress'
 
 function SeriesDetailSkeleton() {
   return (
@@ -186,12 +186,12 @@ function SeriesDetailPage() {
 
   // Downloads (PWA)
   const { isPWA } = usePWA()
-  const [downloadProgress, setDownloadProgress] = useState<
-    Record<string, DownloadProgress>
-  >({})
   const [downloadedBooks, setDownloadedBooks] = useState<Set<string>>(new Set())
   const [showInstallPrompt, setShowInstallPrompt] = useState(false)
-  const [downloadingAll, setDownloadingAll] = useState(false)
+  const downloadStatuses = useDownloadStore((s) => s.statuses)
+  const downloadQueue = useDownloadStore((s) => s.queue)
+  const { addToQueue, pauseDownload, resumeDownload, cancelDownload } =
+    useDownloadStore()
 
   // Check which books are already downloaded
   useEffect(() => {
@@ -208,59 +208,47 @@ function SeriesDetailPage() {
   }, [books])
 
   const handleDownloadBook = useCallback(
-    async (book: Book) => {
+    (book: Book) => {
       if (!isPWA) {
         setShowInstallPrompt(true)
         return
       }
       if (downloadedBooks.has(book.id)) return
-      if (downloadProgress[book.id]?.status === 'downloading') return
+      if (downloadStatuses[book.id]) return // already in queue
 
-      try {
-        await downloadBook(
-          book.id,
-          book.page_count,
-          book.title,
-          seriesName,
-          seriesId,
-          (prog) =>
-            setDownloadProgress((prev) => ({ ...prev, [book.id]: prog })),
-        )
-        setDownloadedBooks((prev) => new Set(prev).add(book.id))
-      } catch (err) {
-        console.error('Download failed:', err)
+      const item: QueueItem = {
+        bookId: book.id,
+        title: book.title,
+        seriesId,
+        seriesName,
+        pageCount: book.page_count,
+        coverUrl: getThumbnailUrl(book.id),
       }
+      addToQueue([item])
     },
-    [isPWA, downloadedBooks, downloadProgress, seriesName, seriesId],
+    [isPWA, downloadedBooks, downloadStatuses, seriesName, seriesId, addToQueue],
   )
 
-  const handleDownloadAll = useCallback(async () => {
+  const handleDownloadAll = useCallback(() => {
     if (!isPWA) {
       setShowInstallPrompt(true)
       return
     }
-    setDownloadingAll(true)
-    for (const book of books) {
-      if (downloadedBooks.has(book.id)) continue
-      if (downloadProgress[book.id]?.status === 'downloading') continue
-      try {
-        await downloadBook(
-          book.id,
-          book.page_count,
-          book.title,
-          seriesName,
-          seriesId,
-          (prog) =>
-            setDownloadProgress((prev) => ({ ...prev, [book.id]: prog })),
-        )
-        setDownloadedBooks((prev) => new Set(prev).add(book.id))
-      } catch (err) {
-        console.error('Download failed:', err)
-        break
-      }
-    }
-    setDownloadingAll(false)
-  }, [isPWA, books, downloadedBooks, downloadProgress, seriesName, seriesId])
+    const items: QueueItem[] = books
+      .filter(
+        (b) =>
+          !downloadedBooks.has(b.id) && !downloadStatuses[b.id],
+      )
+      .map((b) => ({
+        bookId: b.id,
+        title: b.title,
+        seriesId,
+        seriesName,
+        pageCount: b.page_count,
+        coverUrl: getThumbnailUrl(b.id),
+      }))
+    if (items.length > 0) addToQueue(items)
+  }, [isPWA, books, downloadedBooks, downloadStatuses, seriesName, seriesId, addToQueue])
 
   // Close popover on outside click
   useEffect(() => {
@@ -599,7 +587,8 @@ function SeriesDetailPage() {
         {/* Chapter List */}
         <section>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
+            {/* Row 1: Title + Volume/Chapter toggle + List/Grid toggle (all in one row on mobile) */}
+            <div className="flex flex-1 items-center gap-2">
               <h2 className="text-lg font-semibold">
                 {displayMode === 'chapters'
                   ? 'Chapters'
@@ -607,7 +596,7 @@ function SeriesDetailPage() {
                     ? 'Volumes'
                     : 'Chapters'}
               </h2>
-              {/* Volume/Chapter toggle - only show when books are volumes and chapters exist */}
+              {/* Volume/Chapter toggle */}
               {bookLabel === 'volume' && seriesChapters.length > 0 && (
                 <div className="flex items-center rounded-md border border-border bg-muted/50 p-0.5">
                   <button
@@ -632,36 +621,7 @@ function SeriesDetailPage() {
                   </button>
                 </div>
               )}
-            </div>
-            <div className="flex items-center gap-1">
-              {/* Download All button - mobile only */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-1.5 text-muted-foreground md:hidden"
-                onClick={handleDownloadAll}
-                disabled={
-                  downloadingAll ||
-                  books.every((b) => downloadedBooks.has(b.id))
-                }
-              >
-                <HugeiconsIcon
-                  icon={
-                    downloadingAll
-                      ? Loading03Icon
-                      : books.every((b) => downloadedBooks.has(b.id))
-                        ? Tick02Icon
-                        : Download04Icon
-                  }
-                  size={14}
-                  className={downloadingAll ? 'animate-spin' : ''}
-                />
-                {downloadingAll
-                  ? 'Downloading...'
-                  : books.every((b) => downloadedBooks.has(b.id))
-                    ? 'All Downloaded'
-                    : 'Download All'}
-              </Button>
+              {/* List/Grid toggle */}
               <div className="flex items-center rounded-md border border-border bg-muted/50 p-0.5">
                 <button
                   onClick={() => setViewMode('list')}
@@ -684,6 +644,36 @@ function SeriesDetailPage() {
                   <HugeiconsIcon icon={GridViewIcon} size={16} />
                 </button>
               </div>
+            </div>
+            {/* Row 2 right side: Download All + Admin controls */}
+            <div className="flex items-center gap-1">
+              {/* Download All button - mobile only */}
+              {isPWA && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5 text-muted-foreground md:hidden"
+                  onClick={handleDownloadAll}
+                  disabled={
+                    books.every(
+                      (b) =>
+                        downloadedBooks.has(b.id) || !!downloadStatuses[b.id],
+                    )
+                  }
+                >
+                  <HugeiconsIcon
+                    icon={
+                      books.every((b) => downloadedBooks.has(b.id))
+                        ? Download04Icon
+                        : Download04Icon
+                    }
+                    size={14}
+                  />
+                  {books.every((b) => downloadedBooks.has(b.id))
+                    ? 'All Downloaded'
+                    : 'Download All'}
+                </Button>
+              )}
               {isAdmin && (
                 <>
                   {/* AniList ID popover */}
@@ -895,31 +885,53 @@ function SeriesDetailPage() {
                             loading="lazy"
                           />
                           {/* Download button overlay - mobile only */}
-                          <button
-                            className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-all active:scale-90 md:hidden"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              handleDownloadBook(book)
-                            }}
-                          >
-                            {downloadedBooks.has(book.id) ? (
-                              <HugeiconsIcon
-                                icon={Tick02Icon}
-                                size={14}
-                                className="text-green-400"
-                              />
-                            ) : downloadProgress[book.id]?.status ===
-                              'downloading' ? (
-                              <HugeiconsIcon
-                                icon={Loading03Icon}
-                                size={14}
-                                className="animate-spin"
-                              />
-                            ) : (
-                              <HugeiconsIcon icon={Download04Icon} size={14} />
-                            )}
-                          </button>
+                          {isPWA && (
+                            <div
+                              className="absolute right-1.5 top-1.5 z-10 md:hidden"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                const ds = downloadStatuses[book.id]
+                                if (ds?.status === 'downloading')
+                                  pauseDownload(book.id)
+                                else if (ds?.status === 'paused')
+                                  resumeDownload(book.id)
+                                else if (!downloadedBooks.has(book.id) && !ds)
+                                  handleDownloadBook(book)
+                              }}
+                            >
+                              {downloadedBooks.has(book.id) ||
+                              downloadStatuses[book.id]?.status ===
+                                'complete' ? (
+                                <CircularProgress
+                                  progress={1}
+                                  status="complete"
+                                  size={26}
+                                  strokeWidth={2.5}
+                                />
+                              ) : downloadStatuses[book.id] ? (
+                                <CircularProgress
+                                  progress={
+                                    downloadStatuses[book.id].totalPages > 0
+                                      ? downloadStatuses[book.id]
+                                          .downloadedPages /
+                                        downloadStatuses[book.id].totalPages
+                                      : 0
+                                  }
+                                  status={downloadStatuses[book.id].status}
+                                  size={26}
+                                  strokeWidth={2.5}
+                                />
+                              ) : (
+                                <button className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-all active:scale-90">
+                                  <HugeiconsIcon
+                                    icon={Download04Icon}
+                                    size={14}
+                                  />
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <div className="p-2">
                           <p className="truncate text-xs font-medium">
@@ -972,7 +984,7 @@ function SeriesDetailPage() {
                       <div className="group relative cursor-pointer overflow-hidden rounded-lg border border-border/50 bg-card px-4 py-3 transition-all hover:border-border hover:bg-accent/50">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <span className="w-8 text-center text-xs font-medium text-muted-foreground">
+                            <span className="hidden w-8 text-center text-xs font-medium text-muted-foreground md:block">
                               {book.sort_order}
                             </span>
                             <div>
@@ -986,34 +998,56 @@ function SeriesDetailPage() {
                           </div>
                           <div className="flex items-center gap-2">
                             {/* Download button - mobile only */}
-                            <button
-                              className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-all active:scale-90 md:hidden"
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                handleDownloadBook(book)
-                              }}
-                            >
-                              {downloadedBooks.has(book.id) ? (
-                                <HugeiconsIcon
-                                  icon={Tick02Icon}
-                                  size={14}
-                                  className="text-green-500"
-                                />
-                              ) : downloadProgress[book.id]?.status ===
-                                'downloading' ? (
-                                <HugeiconsIcon
-                                  icon={Loading03Icon}
-                                  size={14}
-                                  className="animate-spin"
-                                />
-                              ) : (
-                                <HugeiconsIcon
-                                  icon={Download04Icon}
-                                  size={14}
-                                />
-                              )}
-                            </button>
+                            {isPWA && (
+                              <div
+                                className="md:hidden"
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  const ds = downloadStatuses[book.id]
+                                  if (ds?.status === 'downloading')
+                                    pauseDownload(book.id)
+                                  else if (ds?.status === 'paused')
+                                    resumeDownload(book.id)
+                                  else if (
+                                    !downloadedBooks.has(book.id) &&
+                                    !ds
+                                  )
+                                    handleDownloadBook(book)
+                                }}
+                              >
+                                {downloadedBooks.has(book.id) ||
+                                downloadStatuses[book.id]?.status ===
+                                  'complete' ? (
+                                  <CircularProgress
+                                    progress={1}
+                                    status="complete"
+                                    size={24}
+                                    strokeWidth={2.5}
+                                  />
+                                ) : downloadStatuses[book.id] ? (
+                                  <CircularProgress
+                                    progress={
+                                      downloadStatuses[book.id].totalPages > 0
+                                        ? downloadStatuses[book.id]
+                                            .downloadedPages /
+                                          downloadStatuses[book.id].totalPages
+                                        : 0
+                                    }
+                                    status={downloadStatuses[book.id].status}
+                                    size={24}
+                                    strokeWidth={2.5}
+                                  />
+                                ) : (
+                                  <button className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-all active:scale-90">
+                                    <HugeiconsIcon
+                                      icon={Download04Icon}
+                                      size={14}
+                                    />
+                                  </button>
+                                )}
+                              </div>
+                            )}
                             {isCompleted && (
                               <Badge variant="secondary" className="text-xs">
                                 Completed

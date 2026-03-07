@@ -411,7 +411,10 @@ export async function getStorageEstimate(): Promise<{
 
 // ── Helpers ──
 
-export function saveMetadata(db: IDBDatabase, meta: DownloadMeta): Promise<void> {
+export function saveMetadata(
+  db: IDBDatabase,
+  meta: DownloadMeta,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(META_STORE, 'readwrite')
     const store = tx.objectStore(META_STORE)

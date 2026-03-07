@@ -51,9 +51,7 @@ import {
 import { formatStatus, getDisplayTitle, getRomajiSubtitle } from '@/lib/anilist'
 import { useAppStore } from '@/lib/store'
 import { usePWA } from '@/lib/use-pwa'
-import {
-  isBookDownloaded,
-} from '@/lib/downloads'
+import { isBookDownloaded } from '@/lib/downloads'
 import { useDownloadStore, type QueueItem } from '@/lib/download-store'
 import { CircularProgress } from '@/components/ui/circular-progress'
 
@@ -226,7 +224,14 @@ function SeriesDetailPage() {
       }
       addToQueue([item])
     },
-    [isPWA, downloadedBooks, downloadStatuses, seriesName, seriesId, addToQueue],
+    [
+      isPWA,
+      downloadedBooks,
+      downloadStatuses,
+      seriesName,
+      seriesId,
+      addToQueue,
+    ],
   )
 
   const handleDownloadAll = useCallback(() => {
@@ -235,10 +240,7 @@ function SeriesDetailPage() {
       return
     }
     const items: QueueItem[] = books
-      .filter(
-        (b) =>
-          !downloadedBooks.has(b.id) && !downloadStatuses[b.id],
-      )
+      .filter((b) => !downloadedBooks.has(b.id) && !downloadStatuses[b.id])
       .map((b) => ({
         bookId: b.id,
         title: b.title,
@@ -248,7 +250,15 @@ function SeriesDetailPage() {
         coverUrl: getThumbnailUrl(b.id),
       }))
     if (items.length > 0) addToQueue(items)
-  }, [isPWA, books, downloadedBooks, downloadStatuses, seriesName, seriesId, addToQueue])
+  }, [
+    isPWA,
+    books,
+    downloadedBooks,
+    downloadStatuses,
+    seriesName,
+    seriesId,
+    addToQueue,
+  ])
 
   // Close popover on outside click
   useEffect(() => {
@@ -654,12 +664,10 @@ function SeriesDetailPage() {
                   size="sm"
                   className="gap-1.5 text-muted-foreground md:hidden"
                   onClick={handleDownloadAll}
-                  disabled={
-                    books.every(
-                      (b) =>
-                        downloadedBooks.has(b.id) || !!downloadStatuses[b.id],
-                    )
-                  }
+                  disabled={books.every(
+                    (b) =>
+                      downloadedBooks.has(b.id) || !!downloadStatuses[b.id],
+                  )}
                 >
                   <HugeiconsIcon
                     icon={
@@ -1009,10 +1017,7 @@ function SeriesDetailPage() {
                                     pauseDownload(book.id)
                                   else if (ds?.status === 'paused')
                                     resumeDownload(book.id)
-                                  else if (
-                                    !downloadedBooks.has(book.id) &&
-                                    !ds
-                                  )
+                                  else if (!downloadedBooks.has(book.id) && !ds)
                                     handleDownloadBook(book)
                                 }}
                               >

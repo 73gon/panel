@@ -479,7 +479,10 @@ function AdminDashboard() {
   const loadLogs = async () => {
     setLogsLoading(true)
     try {
-      const data = await fetchAdminLogs(logLevel || undefined, logCategory || undefined)
+      const data = await fetchAdminLogs(
+        logLevel || undefined,
+        logCategory || undefined,
+      )
       setLogs(data)
     } catch {
     } finally {
@@ -532,11 +535,17 @@ function AdminDashboard() {
           }
         >
           <TabsList className="mb-6 w-full overflow-x-auto">
-            <TabsTrigger value="libraries" className="select-none whitespace-nowrap">
+            <TabsTrigger
+              value="libraries"
+              className="select-none whitespace-nowrap"
+            >
               <HugeiconsIcon icon={Library} size={14} className="mr-1.5" />
               Libraries
             </TabsTrigger>
-            <TabsTrigger value="profiles" className="select-none whitespace-nowrap">
+            <TabsTrigger
+              value="profiles"
+              className="select-none whitespace-nowrap"
+            >
               <HugeiconsIcon
                 icon={UserCircleIcon}
                 size={14}
@@ -544,7 +553,10 @@ function AdminDashboard() {
               />
               Profiles
             </TabsTrigger>
-            <TabsTrigger value="settings" className="select-none whitespace-nowrap">
+            <TabsTrigger
+              value="settings"
+              className="select-none whitespace-nowrap"
+            >
               <HugeiconsIcon
                 icon={Settings01Icon}
                 size={14}

@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { motion, AnimatePresence, useMotionValue, useTransform, type PanInfo } from 'motion/react'
+import {
+  motion,
+  AnimatePresence,
+  useMotionValue,
+  useTransform,
+  type PanInfo,
+} from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Download04Icon,
@@ -214,7 +220,10 @@ function SeriesDetail({
   // Add queued items not yet in metadata
   const queue = useDownloadStore((s) => s.queue)
   for (const qi of queue) {
-    if (qi.seriesId === group.seriesId && !allBooks.find((b) => b.bookId === qi.bookId)) {
+    if (
+      qi.seriesId === group.seriesId &&
+      !allBooks.find((b) => b.bookId === qi.bookId)
+    ) {
       allBooks.push({
         bookId: qi.bookId,
         title: qi.title,
@@ -269,9 +278,7 @@ function SeriesDetail({
             }
 
             const progress =
-              book.pageCount > 0
-                ? book.downloadedPages / book.pageCount
-                : 0
+              book.pageCount > 0 ? book.downloadedPages / book.pageCount : 0
 
             return (
               <motion.div

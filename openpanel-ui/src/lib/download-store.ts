@@ -74,7 +74,10 @@ export const useDownloadStore = create<DownloadStore>()((set, get) => ({
 
     const newStatuses = { ...statuses }
     for (const item of newItems) {
-      if (!newStatuses[item.bookId] || newStatuses[item.bookId].status === 'error') {
+      if (
+        !newStatuses[item.bookId] ||
+        newStatuses[item.bookId].status === 'error'
+      ) {
         newStatuses[item.bookId] = {
           bookId: item.bookId,
           status: 'queued',
@@ -264,7 +267,11 @@ async function downloadItem(item: QueueItem) {
       abortControllers.delete(item.bookId)
 
       if (pausedSet.has(item.bookId)) {
-        _setStatus(item.bookId, { status: 'paused', downloadedPages, totalSize })
+        _setStatus(item.bookId, {
+          status: 'paused',
+          downloadedPages,
+          totalSize,
+        })
       }
       return
     }
@@ -311,7 +318,11 @@ async function downloadItem(item: QueueItem) {
         db.close()
         abortControllers.delete(item.bookId)
         if (pausedSet.has(item.bookId)) {
-          _setStatus(item.bookId, { status: 'paused', downloadedPages, totalSize })
+          _setStatus(item.bookId, {
+            status: 'paused',
+            downloadedPages,
+            totalSize,
+          })
         }
         return
       }

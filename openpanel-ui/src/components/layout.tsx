@@ -123,7 +123,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-dvh bg-background text-foreground">
       {/* Desktop Sidebar  hidden on mobile & sign-in */}
-      <aside className={`${isSignIn ? 'hidden' : 'hidden md:flex'} w-14 flex-col items-center justify-between border-r border-border bg-background py-4`}>
+      <aside
+        className={`${isSignIn ? 'hidden' : 'hidden md:flex'} w-14 flex-col items-center justify-between border-r border-border bg-background py-4`}
+      >
         <div className="flex flex-col items-center gap-2">
           <SidebarButton icon={Book02Icon} label="Home" to="/" />
           <SidebarButton

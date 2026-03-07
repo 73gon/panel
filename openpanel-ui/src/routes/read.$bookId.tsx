@@ -80,9 +80,7 @@ function ReaderPage() {
   const [showToc, setShowToc] = useState(false)
 
   // Offline page URLs (IDB blob URLs for downloaded books)
-  const [offlineUrls, setOfflineUrls] = useState<Map<string, string>>(
-    new Map(),
-  )
+  const [offlineUrls, setOfflineUrls] = useState<Map<string, string>>(new Map())
   const isOfflineBook = useRef(false)
 
   // Resolve page URL: IDB blob first, then server
@@ -597,89 +595,89 @@ function ReaderPage() {
               className="absolute right-3 top-1/2 -translate-y-1/2 z-30 w-64 max-h-[calc(100vh-5rem)] overflow-y-auto rounded-xl bg-background/90 backdrop-blur-sm shadow-lg"
               onClick={(e) => e.stopPropagation()}
             >
-            <div className="space-y-3 p-3">
-              {/* Add / remove current page */}
-              <button
-                className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                  isCurrentPageBookmarked
-                    ? 'bg-primary/20 text-primary border border-primary/30'
-                    : 'bg-white/10 text-white/80 border border-white/10 hover:bg-white/15'
-                }`}
-                onClick={() => {
-                  if (isCurrentPageBookmarked) {
-                    const bm = bookmarks.find((b) => b.page === currentPage)
-                    if (bm) handleDeleteBookmark(bm.id)
-                  } else {
-                    handleAddBookmark()
-                  }
-                }}
-              >
-                <HugeiconsIcon
-                  icon={
+              <div className="space-y-3 p-3">
+                {/* Add / remove current page */}
+                <button
+                  className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
                     isCurrentPageBookmarked
-                      ? BookmarkMinus01Icon
-                      : BookmarkAdd01Icon
-                  }
-                  size={16}
-                />
-                {isCurrentPageBookmarked
-                  ? `Remove page ${currentPage}`
-                  : `Bookmark page ${currentPage}`}
-              </button>
+                      ? 'bg-primary/20 text-primary border border-primary/30'
+                      : 'bg-white/10 text-white/80 border border-white/10 hover:bg-white/15'
+                  }`}
+                  onClick={() => {
+                    if (isCurrentPageBookmarked) {
+                      const bm = bookmarks.find((b) => b.page === currentPage)
+                      if (bm) handleDeleteBookmark(bm.id)
+                    } else {
+                      handleAddBookmark()
+                    }
+                  }}
+                >
+                  <HugeiconsIcon
+                    icon={
+                      isCurrentPageBookmarked
+                        ? BookmarkMinus01Icon
+                        : BookmarkAdd01Icon
+                    }
+                    size={16}
+                  />
+                  {isCurrentPageBookmarked
+                    ? `Remove page ${currentPage}`
+                    : `Bookmark page ${currentPage}`}
+                </button>
 
-              {bookmarks.length === 0 ? (
-                <p className="text-center text-sm text-white/40 py-8">
-                  No bookmarks yet
-                </p>
-              ) : (
-                <div className="space-y-1 mt-2">
-                  {bookmarks
-                    .sort((a, b) => a.page - b.page)
-                    .map((bm) => (
-                      <div
-                        key={bm.id}
-                        className={`group flex items-center justify-between rounded-lg px-4 py-3 cursor-pointer transition-colors ${
-                          bm.page === currentPage
-                            ? 'bg-primary/15 text-primary'
-                            : 'text-white/70 hover:bg-white/10'
-                        }`}
-                        onClick={() => {
-                          goToPage(bm.page)
-                          setShowBookmarks(false)
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <HugeiconsIcon
-                            icon={BookmarkAdd01Icon}
-                            size={14}
-                            className="shrink-0 opacity-50"
-                          />
-                          <div>
-                            <span className="text-sm font-medium">
-                              Page {bm.page}
-                            </span>
-                            {bm.note && (
-                              <p className="text-xs opacity-60 mt-0.5">
-                                {bm.note}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <button
-                          className="h-6 w-6 flex items-center justify-center rounded opacity-0 group-hover:opacity-60 hover:opacity-100! transition-opacity text-red-400"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDeleteBookmark(bm.id)
+                {bookmarks.length === 0 ? (
+                  <p className="text-center text-sm text-white/40 py-8">
+                    No bookmarks yet
+                  </p>
+                ) : (
+                  <div className="space-y-1 mt-2">
+                    {bookmarks
+                      .sort((a, b) => a.page - b.page)
+                      .map((bm) => (
+                        <div
+                          key={bm.id}
+                          className={`group flex items-center justify-between rounded-lg px-4 py-3 cursor-pointer transition-colors ${
+                            bm.page === currentPage
+                              ? 'bg-primary/15 text-primary'
+                              : 'text-white/70 hover:bg-white/10'
+                          }`}
+                          onClick={() => {
+                            goToPage(bm.page)
+                            setShowBookmarks(false)
                           }}
                         >
-                          <HugeiconsIcon icon={Cancel01Icon} size={12} />
-                        </button>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
-          </motion.div>
+                          <div className="flex items-center gap-3">
+                            <HugeiconsIcon
+                              icon={BookmarkAdd01Icon}
+                              size={14}
+                              className="shrink-0 opacity-50"
+                            />
+                            <div>
+                              <span className="text-sm font-medium">
+                                Page {bm.page}
+                              </span>
+                              {bm.note && (
+                                <p className="text-xs opacity-60 mt-0.5">
+                                  {bm.note}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            className="h-6 w-6 flex items-center justify-center rounded opacity-0 group-hover:opacity-60 hover:opacity-100! transition-opacity text-red-400"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteBookmark(bm.id)
+                            }}
+                          >
+                            <HugeiconsIcon icon={Cancel01Icon} size={12} />
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
           </>
         )}
       </AnimatePresence>
@@ -704,32 +702,32 @@ function ReaderPage() {
               className="absolute right-3 top-1/2 -translate-y-1/2 z-30 w-64 max-h-[calc(100vh-5rem)] overflow-y-auto rounded-xl bg-background/90 backdrop-blur-sm shadow-lg"
               onClick={(e) => e.stopPropagation()}
             >
-            <div className="py-1">
-              <div className="divide-y divide-white/10">
-                {chapters.map((ch) => {
-                  const isActive =
-                    currentPage >= ch.start_page + 1 &&
-                    currentPage <= ch.end_page + 1
-                  return (
-                    <button
-                      key={ch.chapter_number}
-                      className={`w-full text-left px-4 py-3.5 text-sm transition-colors ${
-                        isActive
-                          ? 'text-primary font-medium'
-                          : 'text-white/70 hover:text-white'
-                      }`}
-                      onClick={() => {
-                        goToPage(ch.start_page + 1)
-                        setShowToc(false)
-                      }}
-                    >
-                      {ch.title}
-                    </button>
-                  )
-                })}
+              <div className="py-1">
+                <div className="divide-y divide-white/10">
+                  {chapters.map((ch) => {
+                    const isActive =
+                      currentPage >= ch.start_page + 1 &&
+                      currentPage <= ch.end_page + 1
+                    return (
+                      <button
+                        key={ch.chapter_number}
+                        className={`w-full text-left px-4 py-3.5 text-sm transition-colors ${
+                          isActive
+                            ? 'text-primary font-medium'
+                            : 'text-white/70 hover:text-white'
+                        }`}
+                        onClick={() => {
+                          goToPage(ch.start_page + 1)
+                          setShowToc(false)
+                        }}
+                      >
+                        {ch.title}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
           </>
         )}
       </AnimatePresence>

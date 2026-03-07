@@ -3,9 +3,9 @@
   "name": "OpenPanel — Manga Reader",
   "icons": [
     {
-      "src": "logo.png",
+      "src": "logo-dark.svg",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ],

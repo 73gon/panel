@@ -1178,42 +1178,6 @@ function AdminDashboard() {
                         </span>
                       </div>
                     </div>
-                    {(updating || updatePhase === 'success') &&
-                      updatePhase !== 'idle' &&
-                      (() => {
-                        const steps = [
-                          'triggered',
-                          'restarting',
-                          'success',
-                        ] as const
-                        const labels = ['Scheduled', 'Restarting', 'Done']
-                        const current = steps.indexOf(
-                          updatePhase as (typeof steps)[number],
-                        )
-                        return (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            {steps.map((step, i) => {
-                              const isDone = i < current
-                              const isActive = i === current
-                              return (
-                                <span
-                                  key={step}
-                                  className="flex items-center gap-1"
-                                >
-                                  <span
-                                    className={`font-medium ${isDone ? 'text-green-600 dark:text-green-400' : isActive ? 'text-foreground' : 'opacity-40'}`}
-                                  >
-                                    {labels[i]}
-                                  </span>
-                                  {i < steps.length - 1 && (
-                                    <span className="opacity-30">→</span>
-                                  )}
-                                </span>
-                              )
-                            })}
-                          </div>
-                        )
-                      })()}
                     {updateMsg && (
                       <p
                         className={`text-xs ${updatePhase === 'success' ? 'text-green-600 dark:text-green-400' : updatePhase === 'failed' ? 'text-yellow-600 dark:text-yellow-400' : 'text-muted-foreground'}`}

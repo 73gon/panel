@@ -211,7 +211,7 @@ function HomePage() {
               <HugeiconsIcon icon={ArrowRight01Icon} size={16} />
             </Link>
             <a
-              href="https://github.com/openreader/openpanel"
+              href="https://github.com/73gon/openpanel"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 border border-border bg-background px-6 py-3 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground hover:border-foreground/30"
